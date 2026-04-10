@@ -24,7 +24,14 @@
     .flatpickr-calendar.hasTime .flatpickr-time { border-top: 1px solid #e2ddd8; }
     .flatpickr-time { background: #f7f5f2; border-radius: 0 0 12px 12px; }
     .flatpickr-time input { font-family: 'DM Sans', sans-serif; font-size: 20px; font-weight: 500; color: #1a1714; background: transparent; }
-    .flatpickr-time .flatpickr-am-pm { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: #00a878; background: #e8f7f2; border-radius: 6px; margin: auto 6px; padding: 4px 10px; cursor: pointer; }
+    /* 오전/오후 — 왼쪽에 배치, 에메랄드 강조 */
+    .flatpickr-time .flatpickr-am-pm {
+      font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+      color: #00a878; background: #e8f7f2; border-radius: 6px;
+      margin: auto 6px auto 8px; padding: 4px 10px; cursor: pointer;
+      order: -1;  /* 왼쪽으로 */
+    }
+    .flatpickr-time { display: flex; align-items: center; }
     .flatpickr-time .numInputWrapper:hover, .flatpickr-time input:hover { background: #e8f7f2; border-radius: 6px; }
     .flatpickr-time input:focus { outline: none; }
     .flatpickr-time .arrowUp:hover, .flatpickr-time .arrowDown:hover { background: #e8f7f2; }
@@ -202,8 +209,8 @@
     .todo-status-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
     .status-none     { background: var(--border-2); border: 1.5px solid var(--text-3); }
     .status-ready    { background: transparent; border: 1.5px solid var(--text-2); }
-    .status-progress { background: var(--accent); }
-    .status-done     { background: var(--done); }
+    .status-progress { background: var(--progress); }   /* 주황 — In Progress */
+    .status-done     { background: var(--done); }       /* 초록 — Done */
 
     .todo-content { flex: 1; min-width: 0; }
     .todo-title { font-size: 13px; color: var(--text-1); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -612,33 +619,33 @@ function fmtDate(iso) {
   return d.toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'});
 }
 function todayLocal() { const n=new Date(); return {y:n.getFullYear(),m:n.getMonth()+1,d:n.getDate()}; }
-// 노션 date 속성은 UTC 기준으로 저장하고, 표시 시 사용자 타임존으로 변환함
-// KST 10:00 = UTC 01:00 → "2026-04-11T01:00:00.000Z" 형태로 전송해야
-// 노션에서 KST 10:00으로 올바르게 표시됨
+
+// KST offset +09:00 명시 ISO 반환 — 노션이 타임존 인식해서 올바른 시각으로 저장
 function nowKSTLocal() {
-  return new Date().toISOString(); // UTC ISO → 노션이 KST로 변환해서 표시
+  const n = new Date();
+  const pad = v => String(v).padStart(2,'0');
+  return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}T${pad(n.getHours())}:${pad(n.getMinutes())}:00+09:00`;
 }
 
-// Flatpickr 선택값(로컬 Date) → 노션 UTC ISO 문자열
-function localDateToNotionUTC(d) {
-  return d.toISOString(); // Date 객체는 내부적으로 UTC. toISOString() = UTC ISO
+// 로컬 Date 객체 → KST offset 명시 ISO (Flatpickr 선택값 저장용)
+function localDateToNotionKST(d) {
+  const pad = v => String(v).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00+09:00`;
 }
 
-// 노션에서 받은 UTC ISO를 로컬 datetime으로 표시
+// 노션에서 받은 ISO를 로컬 datetime으로 표시
 function fmtDateTime(iso) {
   if (!iso) return null;
   const d = parseDate(iso);
   if (!d) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return fmtDate(iso);
-  // 로컬 시간으로 표시 (KST 환경에서 +9h 자동 적용)
   return d.toLocaleString('ko-KR', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
 }
 
-// Flatpickr defaultDate용: 노션 UTC ISO → 로컬 Date 객체
-// (parseDate가 이미 UTC→로컬 변환 처리함)
+// Flatpickr defaultDate용: 저장된 ISO → 로컬 Date 객체
 function notionValToLocalDate(iso) {
   if (!iso) return null;
-  return parseDate(iso); // UTC ISO면 new Date(iso)가 자동으로 로컬로 변환
+  return parseDate(iso);
 }
 
 function escHtml(s) {
@@ -1030,19 +1037,21 @@ function openDtPicker(field){
 
   if (_fpInstances[field]) { _fpInstances[field].destroy(); delete _fpInstances[field]; }
 
+  // 버튼 위치 기준으로 피커 앵커 input 생성
+  const rect = btnEl.getBoundingClientRect();
   const input = document.createElement('input');
   input.type = 'text';
-  input.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0;';
+  // 버튼 위치 근처에 배치 (Flatpickr가 이 위치 기준으로 팝업 띄움)
+  input.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom + 4}px;width:1px;height:1px;opacity:0;pointer-events:none;`;
   document.body.appendChild(input);
 
-  // 노션 UTC ISO → 로컬 Date (Flatpickr에 넘길 기본값)
   const defaultDate = notionValToLocalDate(hiddenEl.value) || null;
 
   const fp = flatpickr(input, {
     enableTime: true,
-    time_24hr: false,       // 오전/오후 표시
-    disableMobile: true,    // 모바일도 커스텀 UI 강제
-    allowInput: true,       // 직접 타이핑 허용
+    time_24hr: false,
+    disableMobile: true,
+    allowInput: true,
     defaultDate,
     locale: {
       firstDayOfWeek: 1,
@@ -1050,14 +1059,26 @@ function openDtPicker(field){
       months: { shorthand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], longhand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'] },
       amPM: ['오전','오후']
     },
+    onReady(_d, _s, fp) {
+      // 오전/오후 버튼을 시간 입력 왼쪽으로 이동
+      const timeContainer = fp.calendarContainer.querySelector('.flatpickr-time');
+      if (timeContainer) {
+        const amPmEl = timeContainer.querySelector('.flatpickr-am-pm');
+        const separator = timeContainer.querySelector('.flatpickr-time-separator');
+        if (amPmEl && separator) {
+          timeContainer.insertBefore(amPmEl, timeContainer.firstChild);
+        }
+      }
+    },
     onClose(selectedDates) {
       if (selectedDates.length) {
-        const d = selectedDates[0]; // 로컬 Date 객체
-        const utcISO = d.toISOString(); // → UTC ISO (노션 저장용)
-        hiddenEl.value = utcISO;
-        btnEl.textContent = fmtDateTime(utcISO); // 표시는 로컬 변환
+        const d = selectedDates[0];
+        // KST offset +09:00 명시해서 노션에 저장 → 노션이 올바른 KST 시각으로 인식
+        const kstISO = localDateToNotionKST(d);
+        hiddenEl.value = kstISO;
+        btnEl.textContent = fmtDateTime(kstISO);
         btnEl.classList.remove('empty');
-        saveDt(field, utcISO);
+        saveDt(field, kstISO);
       }
       setTimeout(() => { input.remove(); delete _fpInstances[field]; }, 100);
     }
