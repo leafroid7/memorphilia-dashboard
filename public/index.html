@@ -126,9 +126,9 @@
     .badge-priority-4 .pri-num { background: #95a5a6; } .badge-priority-4 .pri-divider { background: #95a5a6; } .badge-priority-4 .pri-label { color: var(--text-2); }
 
     /* 소요시간 */
-    .badge-time { font-size: 11px; display: inline-flex; align-items: baseline; gap: 3px; }
-    .time-main { color: #2980b9; font-weight: 500; }
-    .time-sub  { color: #a09a94; font-weight: 400; font-size: 11px; }
+    .badge-time { font-size: 11px; display: inline-flex; align-items: baseline; gap: 3px; color: #a09a94; }
+    .time-main { color: #2980b9 !important; font-weight: 500; }
+    .time-sub  { color: #a09a94 !important; font-weight: 400; font-size: 11px; }
 
     /* 빈/로딩/에러 */
     .empty-state { padding: 40px 24px; text-align: center; color: var(--text-3); }
@@ -319,7 +319,6 @@
       <div class="timer-row" id="timerRow">
         <button class="timer-btn btn-start" id="btnStart" onclick="handleStart()">▶ Start</button>
         <button class="timer-btn btn-end"   id="btnEnd"   onclick="handleEnd()">■ End</button>
-        <span class="timer-info" id="timerInfo"></span>
       </div>
 
       <div class="modal-divider"></div>
@@ -417,12 +416,9 @@ function deadlineDateKey(isoStr) {
   return dateKey(kst.getUTCFullYear(), kst.getUTCMonth()+1, kst.getUTCDate());
 }
 
-// KST ISO datetime 문자열 생성 (Start/End Time용)
+// Start/End Time용 ISO datetime — UTC 전송 (노션이 KST로 알아서 표시)
 function nowKSTIso() {
-  const now = new Date();
-  // KST offset 적용
-  const kst = new Date(now.getTime() + 9*3600000);
-  return kst.toISOString().replace('Z', '+09:00');
+  return new Date().toISOString(); // UTC 그대로 전송
 }
 
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
@@ -793,9 +789,7 @@ function renderDetailModal(todo, actionPlans){
   const isDone=todo.status?.includes('Done');
   const isProgress=todo.status?.includes('Progress');
   document.getElementById('btnStart').disabled=isProgress||isDone;
-  document.getElementById('btnEnd').disabled=!isProgress&&!isDone||isDone;
-  const info=todo.startTime?`시작: ${formatKSTDate(todo.startTime)}`:'';
-  document.getElementById('timerInfo').textContent=info;
+  document.getElementById('btnEnd').disabled=(!isProgress&&!isDone)||isDone;
 }
 
 function closeDetailModal(){
