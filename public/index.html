@@ -268,6 +268,12 @@
     .sb-ready    { background: #edeae4; color: var(--text-2); }
     .sb-progress { background: #fef3e2; color: #b7770d; border: 1px solid #f5cfa0; }
     .sb-done     { background: #e8f5ee; color: #1e8449; border: 1px solid #a9d4b8; }
+    /* 상태 드롭다운 아이템 */
+    .status-dd-item { padding: 8px 12px; font-size: 12px; font-weight: 500; cursor: pointer; transition: background 0.1s; }
+    .status-dd-item:hover { filter: brightness(0.95); }
+    .status-dd-item.sb-ready    { background: #edeae4; color: var(--text-2); }
+    .status-dd-item.sb-progress { background: #fef3e2; color: #b7770d; }
+    .status-dd-item.sb-done     { background: #e8f5ee; color: #1e8449; }
 
     /* 속성 그리드 — VoltAgent 데이터 밀도 방식 */
     .detail-grid {
@@ -605,26 +611,35 @@ function fmtDate(iso) {
   if (!d) return null;
   return d.toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'});
 }
+function todayLocal() { const n=new Date(); return {y:n.getFullYear(),m:n.getMonth()+1,d:n.getDate()}; }
+// 노션 date 속성은 UTC 기준으로 저장하고, 표시 시 사용자 타임존으로 변환함
+// KST 10:00 = UTC 01:00 → "2026-04-11T01:00:00.000Z" 형태로 전송해야
+// 노션에서 KST 10:00으로 올바르게 표시됨
+function nowKSTLocal() {
+  return new Date().toISOString(); // UTC ISO → 노션이 KST로 변환해서 표시
+}
+
+// Flatpickr 선택값(로컬 Date) → 노션 UTC ISO 문자열
+function localDateToNotionUTC(d) {
+  return d.toISOString(); // Date 객체는 내부적으로 UTC. toISOString() = UTC ISO
+}
+
+// 노션에서 받은 UTC ISO를 로컬 datetime으로 표시
 function fmtDateTime(iso) {
   if (!iso) return null;
   const d = parseDate(iso);
   if (!d) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return fmtDate(iso);
+  // 로컬 시간으로 표시 (KST 환경에서 +9h 자동 적용)
   return d.toLocaleString('ko-KR', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
 }
 
-// 현재 로컬 시각을 노션용 datetime 문자열로 반환
-// new Date() 로컬 시간을 직접 포맷 — KST 환경에서 정확
-function nowKSTLocal() {
-  const n = new Date();
-  const pad = v => String(v).padStart(2,'0');
-  return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}T${pad(n.getHours())}:${pad(n.getMinutes())}`;
+// Flatpickr defaultDate용: 노션 UTC ISO → 로컬 Date 객체
+// (parseDate가 이미 UTC→로컬 변환 처리함)
+function notionValToLocalDate(iso) {
+  if (!iso) return null;
+  return parseDate(iso); // UTC ISO면 new Date(iso)가 자동으로 로컬로 변환
 }
-
-// datetime-local input 값 → 노션 저장용 (이미 로컬 datetime이므로 그대로)
-function inputToNotion(val) { return val || null; } // "YYYY-MM-DDTHH:MM"
-
-function todayLocal() { const n=new Date(); return {y:n.getFullYear(),m:n.getMonth()+1,d:n.getDate()}; }
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -905,7 +920,16 @@ function renderDetail(todo, actionPlans){
   document.getElementById('detailDot').className='detail-status-dot '+statusClass(todo.status);
   document.getElementById('detailTitle').textContent=todo.title;
   document.getElementById('detailStatusBadge').innerHTML=
-    `<span class="status-badge ${statusBadgeClass(todo.status)}">${escHtml(todo.status||'None')}</span>`;
+    `<div style="position:relative;display:inline-block;">
+      <span class="status-badge ${statusBadgeClass(todo.status)}" style="cursor:pointer;" onclick="toggleStatusDropdown(this)">
+        ${escHtml(todo.status||'None')} ▾
+      </span>
+      <div class="status-dropdown" id="statusDropdown" style="display:none;position:absolute;top:calc(100%+4px);left:0;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);z-index:200;min-width:140px;overflow:hidden;">
+        <div class="status-dd-item sb-ready"   onclick="changeStatus('🌑Ready')">🌑 Ready</div>
+        <div class="status-dd-item sb-progress" onclick="changeStatus('🌗In Progress')">🌗 In Progress</div>
+        <div class="status-dd-item sb-done"     onclick="changeStatus('🌕Done')">🌕 Done</div>
+      </div>
+    </div>`;
 
   // 속성 그리드 rows
   const rows=[];
@@ -997,7 +1021,6 @@ function makeDtHtml(field, val){
   <input type="hidden" id="dt-hidden-${field}" value="${escHtml(val||'')}">`;
 }
 
-// Flatpickr 인스턴스 저장
 const _fpInstances = {};
 
 function openDtPicker(field){
@@ -1005,37 +1028,37 @@ function openDtPicker(field){
   const btnEl    = document.getElementById(`dt-btn-${field}`);
   if (!hiddenEl || !btnEl) return;
 
-  // 기존 인스턴스 파괴
   if (_fpInstances[field]) { _fpInstances[field].destroy(); delete _fpInstances[field]; }
 
-  // 임시 input 생성
   const input = document.createElement('input');
   input.type = 'text';
-  input.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;';
+  input.style.cssText = 'position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:0;';
   document.body.appendChild(input);
+
+  // 노션 UTC ISO → 로컬 Date (Flatpickr에 넘길 기본값)
+  const defaultDate = notionValToLocalDate(hiddenEl.value) || null;
 
   const fp = flatpickr(input, {
     enableTime: true,
-    time_24hr: false,          // 오전/오후 표시
-    dateFormat: 'Y-m-dTH:i',  // 노션 저장 형식
-    defaultDate: hiddenEl.value || null,
+    time_24hr: false,       // 오전/오후 표시
+    disableMobile: true,    // 모바일도 커스텀 UI 강제
+    allowInput: true,       // 직접 타이핑 허용
+    defaultDate,
     locale: {
       firstDayOfWeek: 1,
-      weekdays: { shorthand: ['일','월','화','수','목','금','토'], longhand: ['일','월','화','수','목','금','토'] },
-      months: { shorthand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], longhand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'] }
+      weekdays: { shorthand: ['일','월','화','수','목','금','토'], longhand: ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'] },
+      months: { shorthand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], longhand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'] },
+      amPM: ['오전','오후']
     },
-    onClose(selectedDates, dateStr) {
+    onClose(selectedDates) {
       if (selectedDates.length) {
-        // 선택된 로컬 datetime → "YYYY-MM-DDTHH:MM" 포맷
-        const d = selectedDates[0];
-        const pad = v => String(v).padStart(2,'0');
-        const notionVal = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        hiddenEl.value = notionVal;
-        btnEl.textContent = fmtDateTime(notionVal);
+        const d = selectedDates[0]; // 로컬 Date 객체
+        const utcISO = d.toISOString(); // → UTC ISO (노션 저장용)
+        hiddenEl.value = utcISO;
+        btnEl.textContent = fmtDateTime(utcISO); // 표시는 로컬 변환
         btnEl.classList.remove('empty');
-        saveDt(field, notionVal);
+        saveDt(field, utcISO);
       }
-      // 임시 input 정리
       setTimeout(() => { input.remove(); delete _fpInstances[field]; }, 100);
     }
   });
@@ -1086,38 +1109,89 @@ function closeDetail(){
 }
 function openNotion(){if(currentTodo?.url)window.open(currentTodo.url,'_blank');}
 
-// Start / End 버튼 — 언제든 재클릭 가능
+// Start / End 버튼 — 언제든 재클릭 가능, DOM 교체 없이 직접 업데이트
 async function handleStart(){
   if(!currentTodo)return;
   const btn=document.getElementById('btnStart');
   const orig=btn.innerHTML;
-  btn.disabled=true;btn.innerHTML=`<div class="spinner-sm"></div>`;
+  btn.disabled=true; btn.innerHTML=`<div class="spinner-sm"></div>`;
   try{
-    const kstNow=nowKSTLocal();
-    await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{status:'🌗In Progress',startTime:kstNow}});
-    currentTodo.status='🌗In Progress';currentTodo.startTime=kstNow;
-    updateCache(currentTodo.id,{status:'🌗In Progress',startTime:kstNow});
-    renderDetail(currentTodo,[]);
+    const utcNow=nowKSTLocal();
+    await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{status:'🌗In Progress',startTime:utcNow}});
+    currentTodo.status='🌗In Progress'; currentTodo.startTime=utcNow;
+    updateCache(currentTodo.id,{status:'🌗In Progress',startTime:utcNow});
+    // 상태 배지만 직접 업데이트
+    _refreshStatusBadge('🌗In Progress');
+    // Start 버튼 표시값 업데이트
+    const startBtn=document.getElementById('dt-btn-startTime');
+    const startHidden=document.getElementById('dt-hidden-startTime');
+    if(startBtn){startBtn.textContent=fmtDateTime(utcNow);startBtn.classList.remove('empty');}
+    if(startHidden)startHidden.value=utcNow;
     updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
     showToast('▶ 시작됐어요');
   }catch(e){showToast('오류: '+e.message);}
-  finally{btn.disabled=false;btn.innerHTML=orig;}
+  finally{btn.disabled=false; btn.innerHTML=orig;}
 }
 async function handleEnd(){
   if(!currentTodo)return;
   const btn=document.getElementById('btnEnd');
   const orig=btn.innerHTML;
-  btn.disabled=true;btn.innerHTML=`<div class="spinner-sm"></div>`;
+  btn.disabled=true; btn.innerHTML=`<div class="spinner-sm"></div>`;
   try{
-    const kstNow=nowKSTLocal();
-    await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{status:'🌕Done',endTime:kstNow}});
-    currentTodo.status='🌕Done';currentTodo.endTime=kstNow;
-    updateCache(currentTodo.id,{status:'🌕Done',endTime:kstNow});
-    renderDetail(currentTodo,[]);
+    const utcNow=nowKSTLocal();
+    await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{status:'🌕Done',endTime:utcNow}});
+    currentTodo.status='🌕Done'; currentTodo.endTime=utcNow;
+    updateCache(currentTodo.id,{status:'🌕Done',endTime:utcNow});
+    _refreshStatusBadge('🌕Done');
+    const endBtn=document.getElementById('dt-btn-endTime');
+    const endHidden=document.getElementById('dt-hidden-endTime');
+    if(endBtn){endBtn.textContent=fmtDateTime(utcNow);endBtn.classList.remove('empty');}
+    if(endHidden)endHidden.value=utcNow;
     updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
     showToast('■ 완료됐어요');
   }catch(e){showToast('오류: '+e.message);}
-  finally{btn.disabled=false;btn.innerHTML=orig;}
+  finally{btn.disabled=false; btn.innerHTML=orig;}
+}
+
+// 상태 드롭다운 토글
+function toggleStatusDropdown(el){
+  const dd=document.getElementById('statusDropdown');
+  if(!dd)return;
+  dd.style.display=dd.style.display==='none'?'block':'none';
+}
+// 외부 클릭 시 상태 드롭다운 닫기
+document.addEventListener('click',e=>{
+  const badge=document.getElementById('detailStatusBadge');
+  if(badge&&!badge.contains(e.target)){
+    const dd=document.getElementById('statusDropdown');
+    if(dd)dd.style.display='none';
+  }
+});
+
+async function changeStatus(newStatus){
+  if(!currentTodo)return;
+  const dd=document.getElementById('statusDropdown');
+  if(dd)dd.style.display='none';
+  try{
+    await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{status:newStatus}});
+    currentTodo.status=newStatus;
+    updateCache(currentTodo.id,{status:newStatus});
+    _refreshStatusBadge(newStatus);
+    // topbar, dot도 업데이트
+    document.getElementById('detailDot').className='detail-status-dot '+statusClass(newStatus);
+    updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
+    showToast('상태가 변경됐어요');
+  }catch(e){showToast('오류: '+e.message);}
+}
+
+function _refreshStatusBadge(status){
+  const wrap=document.getElementById('detailStatusBadge');
+  if(!wrap)return;
+  const badge=wrap.querySelector('.status-badge');
+  if(badge){
+    badge.className=`status-badge ${statusBadgeClass(status)}`;
+    badge.childNodes[0].textContent=`${status||'None'} `;
+  }
 }
 
 // ══════════════════════════════════════════════════════
