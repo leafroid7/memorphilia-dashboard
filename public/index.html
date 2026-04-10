@@ -7,7 +7,33 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
+    /* Flatpickr 커스텀 테마 */
+    .flatpickr-calendar { font-family: 'DM Sans', sans-serif; border-radius: 12px; border: 1px solid #d4cec8; box-shadow: 0 12px 48px rgba(0,0,0,0.14); background: #fff; }
+    .flatpickr-months { padding: 8px 0 4px; }
+    .flatpickr-months .flatpickr-month, .flatpickr-current-month { color: #1a1714; }
+    .flatpickr-current-month { font-size: 14px; font-weight: 500; }
+    .flatpickr-current-month select.flatpickr-monthDropdown-months { font-family: 'DM Sans', sans-serif; }
+    .flatpickr-day { border-radius: 50%; font-size: 13px; color: #1a1714; }
+    .flatpickr-day.selected, .flatpickr-day.selected:hover { background: #00a878; border-color: #00a878; color: #fff; }
+    .flatpickr-day.today { border-color: #00a878; color: #00a878; }
+    .flatpickr-day.today:hover { background: #e8f7f2; }
+    .flatpickr-day:hover { background: #f7f5f2; border-color: transparent; }
+    .flatpickr-weekday { color: #a09a94; font-size: 11px; font-weight: 600; }
+    .flatpickr-calendar.hasTime .flatpickr-time { border-top: 1px solid #e2ddd8; }
+    .flatpickr-time { background: #f7f5f2; border-radius: 0 0 12px 12px; }
+    .flatpickr-time input { font-family: 'DM Sans', sans-serif; font-size: 20px; font-weight: 500; color: #1a1714; background: transparent; }
+    .flatpickr-time .flatpickr-am-pm { font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; color: #00a878; background: #e8f7f2; border-radius: 6px; margin: auto 6px; padding: 4px 10px; cursor: pointer; }
+    .flatpickr-time .numInputWrapper:hover, .flatpickr-time input:hover { background: #e8f7f2; border-radius: 6px; }
+    .flatpickr-time input:focus { outline: none; }
+    .flatpickr-time .arrowUp:hover, .flatpickr-time .arrowDown:hover { background: #e8f7f2; }
+    .flatpickr-months .flatpickr-prev-month svg, .flatpickr-months .flatpickr-next-month svg { fill: #6b6560; }
+    .flatpickr-months .flatpickr-prev-month:hover svg, .flatpickr-months .flatpickr-next-month:hover svg { fill: #00a878; }
+    /* flatpickr trigger 버튼 */
+    .dt-trigger { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: #6b6560; cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; background: none; border: none; font-family: 'DM Sans', sans-serif; padding: 0; }
+    .dt-trigger:hover { color: #00a878; }
+    .dt-trigger.empty { color: #a09a94; font-style: italic; }
     /* ═══════════════════════════════════════════════
        DESIGN: 따뜻한 베이지 베이스 + VoltAgent 스타일 적용
        - 배경/표면: 기존 따뜻한 톤 유지
@@ -587,12 +613,12 @@ function fmtDateTime(iso) {
   return d.toLocaleString('ko-KR', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
 }
 
-// 현재 KST 시각을 노션용 로컬 datetime 문자열로 반환
-// 노션 date 속성은 타임존 없는 로컬 datetime으로 저장해야 올바르게 표시됨
+// 현재 로컬 시각을 노션용 datetime 문자열로 반환
+// new Date() 로컬 시간을 직접 포맷 — KST 환경에서 정확
 function nowKSTLocal() {
-  const kst = new Date(Date.now() + 9 * 3600000);
-  const iso = kst.toISOString(); // UTC 기준이지만 +9h 더했으므로 KST 시각
-  return iso.slice(0,16); // "YYYY-MM-DDTHH:MM" — 타임존 없음
+  const n = new Date();
+  const pad = v => String(v).padStart(2,'0');
+  return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}T${pad(n.getHours())}:${pad(n.getMinutes())}`;
 }
 
 // datetime-local input 값 → 노션 저장용 (이미 로컬 datetime이므로 그대로)
@@ -959,42 +985,72 @@ function renderDetail(todo, actionPlans){
     },{once:false});
   }
 
-  // 타이머 버튼 상태
-  const isDone=todo.status?.includes('Done');
-  const isProg=todo.status?.includes('Progress');
-  document.getElementById('btnStart').disabled=isProg||isDone;
-  document.getElementById('btnEnd').disabled=(!isProg)||isDone;
+  // 타이머 버튼 — 항상 활성화 (언제든 재클릭 가능)
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnEnd').disabled=false;
 }
 
 function makeDtHtml(field, val){
-  // datetime-local input을 숨기고 텍스트 클릭 시 열리는 방식
-  const display=val?escHtml(fmtDateTime(val)):'클릭하여 입력';
-  const cls=val?'detail-dt-display':'detail-dt-empty';
-  // 노션에 저장된 로컬 datetime을 input value로 변환 ("YYYY-MM-DDTHH:MM")
-  const inputVal=val&&val.length>=16?val.slice(0,16):'';
-  return`<div class="detail-dt-wrap">
-    <span class="${cls}" id="dt-disp-${field}">${display}</span>
-    <input type="datetime-local" class="detail-dt-input" id="dt-input-${field}" value="${inputVal}"
-      onchange="saveDt('${field}',this.value)" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer;">
-  </div>`;
+  const display = val ? escHtml(fmtDateTime(val)) : '날짜·시간 입력';
+  const cls = val ? '' : 'empty';
+  return `<button class="dt-trigger ${cls}" id="dt-btn-${field}" onclick="openDtPicker('${field}')">${display}</button>
+  <input type="hidden" id="dt-hidden-${field}" value="${escHtml(val||'')}">`;
+}
+
+// Flatpickr 인스턴스 저장
+const _fpInstances = {};
+
+function openDtPicker(field){
+  const hiddenEl = document.getElementById(`dt-hidden-${field}`);
+  const btnEl    = document.getElementById(`dt-btn-${field}`);
+  if (!hiddenEl || !btnEl) return;
+
+  // 기존 인스턴스 파괴
+  if (_fpInstances[field]) { _fpInstances[field].destroy(); delete _fpInstances[field]; }
+
+  // 임시 input 생성
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.style.cssText = 'position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;';
+  document.body.appendChild(input);
+
+  const fp = flatpickr(input, {
+    enableTime: true,
+    time_24hr: false,          // 오전/오후 표시
+    dateFormat: 'Y-m-dTH:i',  // 노션 저장 형식
+    defaultDate: hiddenEl.value || null,
+    locale: {
+      firstDayOfWeek: 1,
+      weekdays: { shorthand: ['일','월','화','수','목','금','토'], longhand: ['일','월','화','수','목','금','토'] },
+      months: { shorthand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], longhand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'] }
+    },
+    onClose(selectedDates, dateStr) {
+      if (selectedDates.length) {
+        // 선택된 로컬 datetime → "YYYY-MM-DDTHH:MM" 포맷
+        const d = selectedDates[0];
+        const pad = v => String(v).padStart(2,'0');
+        const notionVal = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        hiddenEl.value = notionVal;
+        btnEl.textContent = fmtDateTime(notionVal);
+        btnEl.classList.remove('empty');
+        saveDt(field, notionVal);
+      }
+      // 임시 input 정리
+      setTimeout(() => { input.remove(); delete _fpInstances[field]; }, 100);
+    }
+  });
+
+  _fpInstances[field] = fp;
+  fp.open();
 }
 
 async function saveDt(field, val){
-  if(!currentTodo)return;
-  const notionVal=inputToNotion(val); // "YYYY-MM-DDTHH:MM" 그대로
-  const updates={};
-  if(field==='startTime') updates.startTime=notionVal;
-  else updates.endTime=notionVal;
+  if(!currentTodo) return;
+  const updates = field==='startTime' ? {startTime:val} : {endTime:val};
   try{
-    await api({action:'updateTodo'},{pageId:currentTodo.id,updates});
-    currentTodo[field]=notionVal;
-    updateCache(currentTodo.id,{[field]:notionVal});
-    // 표시 업데이트
-    const disp=document.getElementById(`dt-disp-${field}`);
-    if(disp){
-      disp.textContent=notionVal?fmtDateTime(notionVal):'클릭하여 입력';
-      disp.className=notionVal?'detail-dt-display':'detail-dt-empty';
-    }
+    await api({action:'updateTodo'},{pageId:currentTodo.id, updates});
+    currentTodo[field]=val;
+    updateCache(currentTodo.id,{[field]:val});
     showToast('저장됐어요');
   }catch(e){showToast('저장 실패: '+e.message);}
 }
@@ -1030,10 +1086,11 @@ function closeDetail(){
 }
 function openNotion(){if(currentTodo?.url)window.open(currentTodo.url,'_blank');}
 
-// Start / End 버튼
+// Start / End 버튼 — 언제든 재클릭 가능
 async function handleStart(){
   if(!currentTodo)return;
   const btn=document.getElementById('btnStart');
+  const orig=btn.innerHTML;
   btn.disabled=true;btn.innerHTML=`<div class="spinner-sm"></div>`;
   try{
     const kstNow=nowKSTLocal();
@@ -1043,11 +1100,13 @@ async function handleStart(){
     renderDetail(currentTodo,[]);
     updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
     showToast('▶ 시작됐어요');
-  }catch(e){showToast('오류: '+e.message);btn.disabled=false;btn.textContent='▶ Start';}
+  }catch(e){showToast('오류: '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML=orig;}
 }
 async function handleEnd(){
   if(!currentTodo)return;
   const btn=document.getElementById('btnEnd');
+  const orig=btn.innerHTML;
   btn.disabled=true;btn.innerHTML=`<div class="spinner-sm"></div>`;
   try{
     const kstNow=nowKSTLocal();
@@ -1057,7 +1116,8 @@ async function handleEnd(){
     renderDetail(currentTodo,[]);
     updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
     showToast('■ 완료됐어요');
-  }catch(e){showToast('오류: '+e.message);btn.disabled=false;btn.textContent='■ End';}
+  }catch(e){showToast('오류: '+e.message);}
+  finally{btn.disabled=false;btn.innerHTML=orig;}
 }
 
 // ══════════════════════════════════════════════════════
@@ -1172,5 +1232,6 @@ async function loadAndRender(){
 }
 loadAndRender();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </body>
 </html>
