@@ -1,0 +1,7 @@
+{
+  "name": "memorphilia-dashboard",
+  "version": "1.0.0",
+  "dependencies": {
+    "@notionhq/client": "5.0.0"
+  }
+}
