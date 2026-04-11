@@ -224,7 +224,17 @@
     .status-done     { background: var(--done); }       /* 초록 — Done */
 
     .todo-content { flex: 1; min-width: 0; }
-    .todo-title { font-size: 13px; color: var(--text-1); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* 제목: 34자 기준 줄바꿈, 카드는 아래로 늘어남 */
+    .todo-title {
+      font-size: 13px; color: var(--text-1); line-height: 1.4;
+      white-space: normal;          /* 줄바꿈 허용 */
+      word-break: keep-all;         /* 한글 단어 단위 줄바꿈 */
+      overflow-wrap: break-word;    /* 긴 영문/URL 강제 줄바꿈 */
+      display: -webkit-box;
+      -webkit-line-clamp: 3;        /* 최대 3줄 */
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     .todo-title.done-title { text-decoration: line-through; color: var(--text-3); }
     .todo-meta { display: flex; gap: 5px; margin-top: 3px; flex-wrap: wrap; align-items: center; }
 
@@ -1061,6 +1071,9 @@ function makeDtHtml(field, val){
   <input type="hidden" id="dt-hidden-${field}" value="${escHtml(val||'')}">`;
 }
 
+// Flatpickr 인스턴스 저장 — openDateOnlyPicker, openDtPicker 모두 사용
+const _fpInstances = {};
+
 // 날짜만 편집 (마감일용 — 시간 없음)
 function makeDateOnlyHtml(field, val){
   const display = val ? escHtml(fmtDate(val)) : '날짜 입력';
@@ -1117,8 +1130,6 @@ function openDateOnlyPicker(field){
   _fpInstances[field] = fp;
   fp.open();
 }
-
-const _fpInstances = {};
 
 function openDtPicker(field){
   const hiddenEl = document.getElementById(`dt-hidden-${field}`);
