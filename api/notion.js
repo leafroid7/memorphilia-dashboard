@@ -162,6 +162,14 @@ module.exports = async (req, res) => {
       return res.json({ todos: response.results.map(mapTodo) });
     }
 
+    // ── archiveTodo: 페이지 아카이브(삭제) ───────────
+    if (action === 'archiveTodo') {
+      const { pageId } = req.body;
+      if (!pageId) return res.status(400).json({ error: 'pageId required' });
+      await notion.pages.update({ page_id: pageId, archived: true });
+      return res.json({ success: true });
+    }
+
     return res.status(400).json({ error: 'Unknown action' });
 
   } catch (error) {

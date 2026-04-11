@@ -409,6 +409,19 @@
     /* VoltAgent primary: dark surface + accent text */
     .btn-primary { background: var(--text-1); color: #fff; }
     .btn-primary:hover:not(:disabled) { background: #2d2926; }
+    .btn-danger { background: #fde8e6; color: var(--danger); border: 1px solid #e8b4b0; }
+    .btn-danger:hover:not(:disabled) { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .btn-danger-confirm { background: var(--danger); color: #fff; }
+    .btn-danger-confirm:hover:not(:disabled) { background: #a93226; }
+    /* 삭제 확인 배너 */
+    .delete-confirm-bar {
+      display: none; align-items: center; gap: 8px; justify-content: space-between;
+      padding: 10px 14px; background: #fde8e6;
+      border-radius: var(--radius-sm); margin-bottom: 12px;
+      border: 1px solid #e8b4b0;
+    }
+    .delete-confirm-bar.open { display: flex; animation: fadeIn 0.15s ease; }
+    .delete-confirm-text { font-size: 12px; color: var(--danger); font-weight: 500; }
 
     /* ══ 생성 모달 ══ */
     .create-title-row { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
@@ -595,7 +608,17 @@
         </div>
       </div>
 
+      <!-- 삭제 확인 배너 -->
+      <div class="delete-confirm-bar" id="deleteConfirmBar">
+        <span class="delete-confirm-text">⚠️ 삭제하면 복구할 수 없어요</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-ghost" onclick="cancelDelete()" style="padding:5px 12px;font-size:11px;">취소</button>
+          <button class="btn btn-danger-confirm" onclick="confirmDelete()" style="padding:5px 12px;font-size:11px;">삭제 확인</button>
+        </div>
+      </div>
+
       <div class="modal-footer">
+        <button class="btn btn-danger" onclick="requestDelete()" id="btnDelete" style="margin-right:auto;">삭제</button>
         <button class="btn btn-ghost" onclick="closeDetail()">닫기</button>
         <button class="btn btn-primary" onclick="openNotion()">
           <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1293,10 +1316,41 @@ async function selectDetailAp(id, title, icon){
 
 function closeDetail(){
   document.getElementById('detailOverlay').classList.remove('open');
+  document.getElementById('deleteConfirmBar').classList.remove('open');
   document.body.style.overflow='';
   currentTodo=null;
 }
 function openNotion(){if(currentTodo?.url)window.open(currentTodo.url,'_blank');}
+
+// 삭제 플로우 — 2단계 확인
+function requestDelete(){
+  document.getElementById('deleteConfirmBar').classList.add('open');
+  document.getElementById('btnDelete').style.display='none';
+}
+function cancelDelete(){
+  document.getElementById('deleteConfirmBar').classList.remove('open');
+  document.getElementById('btnDelete').style.display='';
+}
+async function confirmDelete(){
+  if(!currentTodo)return;
+  const bar=document.getElementById('deleteConfirmBar');
+  bar.innerHTML=`<span class="delete-confirm-text"><div class="spinner-sm dark" style="display:inline-block;vertical-align:middle;margin-right:6px;"></div> 삭제 중...</span>`;
+  try{
+    await api({action:'archiveTodo'},{pageId:currentTodo.id});
+    // 캐시에서 제거
+    for(const k of Object.keys(todoCache)){
+      const i=todoCache[k].findIndex(t=>t.id===currentTodo.id);
+      if(i>=0){todoCache[k].splice(i,1);break;}
+    }
+    closeDetail();
+    showToast('🗑️ 삭제됐어요');
+    updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
+    if(currentMode==='memo') loadMemoMode();
+  }catch(e){
+    showToast('삭제 실패: '+e.message);
+    cancelDelete();
+  }
+}
 
 // Start / End 버튼 — 언제든 재클릭 가능, DOM 교체 없이 직접 업데이트
 async function handleStart(){
@@ -1611,15 +1665,13 @@ function togglePresetEdit() {
 }
 
 // ══════════════════════════════════════════════════════
-// 생성 모달 초기화 시 프리셋 버튼 렌더
+// 생성 모달 제출
 // ══════════════════════════════════════════════════════
-  const title=document.getElementById('newTitle').value.trim();
-  const deadline=document.getElementById('newDeadline').value;
+async function submitCreate(){
   const titleEl=document.getElementById('newTitle');
   const title=titleEl.value.trim();
   const deadline=document.getElementById('newDeadline').value;
   const note=document.getElementById('newNote')?.value.trim()||'';
-  // 프리셋에서 설정된 값 읽기
   const presetEst = titleEl.dataset.presetEst ? Number(titleEl.dataset.presetEst) : null;
   const presetGroupMode = titleEl.dataset.presetGroupMode || null;
   if(!title){showToast('제목을 입력해주세요');titleEl.focus();return;}
