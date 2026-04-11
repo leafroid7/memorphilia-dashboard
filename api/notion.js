@@ -116,12 +116,24 @@ module.exports = async (req, res) => {
       if (updates.status !== undefined)
         properties['🪐'] = { status: { name: updates.status } };
 
-      // Start/End Time — 노션 date 속성은 타임존 없는 로컬 datetime 문자열로 저장
-      // 프론트에서 "YYYY-MM-DDTHH:MM" 형태로 보내면 그대로 사용
       if (updates.startTime !== undefined)
         properties['Start Time'] = updates.startTime ? { date: { start: updates.startTime } } : { date: null };
       if (updates.endTime !== undefined)
         properties['End Time'] = updates.endTime ? { date: { start: updates.endTime } } : { date: null };
+
+      // 데드라인 범위 업데이트 (start~end)
+      if (updates.deadline !== undefined) {
+        if (updates.deadline === null) {
+          properties['데드라인'] = { date: null };
+        } else if (updates.deadlineEnd) {
+          properties['데드라인'] = { date: { start: updates.deadline, end: updates.deadlineEnd } };
+        } else {
+          properties['데드라인'] = { date: { start: updates.deadline } };
+        }
+      }
+
+      if (updates.groupMode !== undefined)
+        properties['그룹\uD835\uDDF4\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2'] = { select: updates.groupMode ? { name: updates.groupMode } : null };
       if (updates.note !== undefined)
         properties['비고'] = { rich_text: [{ text: { content: updates.note || '' } }] };
       if (updates.est !== undefined)
@@ -134,6 +146,19 @@ module.exports = async (req, res) => {
 
       await notion.pages.update({ page_id: pageId, properties });
       return res.json({ success: true });
+    }
+
+    // ── getMemos: 임시 메모 목록 (모드 전환용) ──────────
+    if (action === 'getMemos') {
+      const response = await notion.dataSources.query({
+        data_source_id: TODO_DB_ID,
+        filter: {
+          property: '𝐀𝐜𝐭𝐢𝐨𝐧 𝐏𝐥𝐚𝐧 𝒇𝒓𝒐𝒎',
+          relation: { contains: IMSI_MEMO_PAGE_ID }
+        },
+        sorts: [{ timestamp: 'created_time', direction: 'descending' }]
+      });
+      return res.json({ todos: response.results.map(mapTodo) });
     }
 
     return res.status(400).json({ error: 'Unknown action' });

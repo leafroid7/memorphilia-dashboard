@@ -10,7 +10,14 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <style>
     /* Flatpickr 커스텀 테마 */
-    .flatpickr-calendar { font-family: 'DM Sans', sans-serif; border-radius: 12px; border: 1px solid #d4cec8; box-shadow: 0 12px 48px rgba(0,0,0,0.14); background: #fff; }
+    .flatpickr-calendar { font-family: 'DM Sans', sans-serif; border-radius: 12px; border: 1px solid #d4cec8; box-shadow: 0 24px 80px rgba(0,0,0,0.28), 0 4px 16px rgba(0,0,0,0.12); background: #fff; }
+    /* Flatpickr 하단 저장/취소 버튼 */
+    .fp-footer { display: flex; gap: 6px; justify-content: flex-end; padding: 8px 12px; background: #f7f5f2; border-top: 1px solid #e2ddd8; border-radius: 0 0 12px 12px; }
+    .fp-btn { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; transition: all 0.12s; }
+    .fp-btn-cancel { background: #edeae4; color: #6b6560; }
+    .fp-btn-cancel:hover { background: #e2ddd8; }
+    .fp-btn-save { background: #00a878; color: #fff; }
+    .fp-btn-save:hover { background: #008c64; }
     .flatpickr-months { padding: 8px 0 4px; }
     .flatpickr-months .flatpickr-month, .flatpickr-current-month { color: #1a1714; }
     .flatpickr-current-month { font-size: 14px; font-weight: 500; }
@@ -249,6 +256,8 @@
     @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
     .modal { background: var(--surface); border-radius: 16px; border: 1px solid var(--border-2); box-shadow: var(--shadow-lg); width: 100%; max-width: 500px; animation: slideUp 0.18s ease; overflow: hidden; }
+    /* 제목 줄바꿈 — 가로 고정, 세로로 늘어남 */
+    .detail-title-text { font-family: 'DM Serif Display', serif; font-size: 17px; line-height: 1.4; color: var(--text-1); flex: 1; word-break: keep-all; overflow-wrap: break-word; white-space: normal; }
     @keyframes slideUp { from { transform: translateY(10px); opacity:0; } to { transform: translateY(0); opacity:1; } }
 
     /* VoltAgent: 상단 컬러 바 — priority/accent 신호 */
@@ -267,7 +276,6 @@
     /* ══ 상세 모달 레이아웃 ══ */
     .detail-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
     .detail-status-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
-    .detail-title-text { font-family: 'DM Serif Display', serif; font-size: 17px; line-height: 1.35; color: var(--text-1); flex: 1; }
 
     /* 상태 배지 — 노션 스타일 */
     .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; margin-bottom: 14px; }
@@ -334,6 +342,14 @@
 
     /* 액션 플랜 태그 + 편집 */
     .ap-tag { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 9999px; background: var(--accent-bg); border: 1px solid #b2dfd0; font-size: 11px; color: var(--accent); }
+    /* 그룹모드 select */
+    .detail-select {
+      font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--text-2);
+      background: transparent; border: 1px solid transparent; border-radius: 4px;
+      padding: 2px 4px; outline: none; cursor: pointer; max-width: 100%;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .detail-select:hover, .detail-select:focus { border-color: var(--accent); background: var(--surface-2); }
     .ap-edit-wrap { position: relative; width: 100%; }
     .ap-edit-input {
       width: 100%; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px;
@@ -343,10 +359,10 @@
     .ap-edit-input:focus { border-color: var(--accent); background: var(--surface-2); }
     .ap-edit-input::placeholder { color: var(--text-3); }
     .ap-edit-dropdown {
-      position: absolute; top: calc(100% + 3px); left: 0; right: 0;
+      position: absolute; top: calc(100% + 3px); left: -22px; right: -22px;
       background: var(--surface); border: 1px solid var(--border-2);
-      border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
-      z-index: 200; max-height: 180px; overflow-y: auto; display: none;
+      border-radius: var(--radius-sm); box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+      z-index: 500; max-height: 280px; overflow-y: auto; display: none;
     }
     .ap-edit-dropdown.open { display: block; }
     .ap-dd-item { padding: 8px 11px; cursor: pointer; font-size: 12px; color: var(--text-1); transition: background 0.1s; border-bottom: 1px solid var(--border); }
@@ -440,8 +456,9 @@
         <div class="cal-day-num" id="selectedDayNum">11</div>
         <div class="cal-month-name" id="selectedMonthName">April</div>
       </div>
-      <button class="cal-icon-btn" onclick="goToToday()">
-        <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- 달력 아이콘: 클릭 시 모드 전환 (캘린더 ↔ 메모 목록) -->
+      <button class="cal-icon-btn" id="modeToggleBtn" onclick="toggleMode()" title="모드 전환">
+        <svg id="modeIconSvg" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="5" y="9" width="30" height="26" rx="5" fill="#e8e4df"/>
           <rect x="5" y="9" width="30" height="10" rx="5" fill="#00a878"/>
           <rect x="5" y="14" width="30" height="5" fill="#00a878"/>
@@ -454,9 +471,9 @@
       </button>
     </div>
 
-    <div class="month-progress"><div class="month-progress-fill" id="monthProgress" style="width:0%"></div></div>
+    <div class="month-progress" id="monthProgress"><div class="month-progress-fill" id="monthProgressFill" style="width:0%"></div></div>
 
-    <div class="cal-weekdays">
+    <div class="cal-weekdays" id="calWeekdays">
       <div class="cal-weekday">M</div><div class="cal-weekday">T</div><div class="cal-weekday">W</div>
       <div class="cal-weekday">T</div><div class="cal-weekday">F</div>
       <div class="cal-weekday" style="color:var(--text-2)">S</div>
@@ -464,7 +481,7 @@
     </div>
     <div class="cal-grid" id="calGrid"></div>
 
-    <div class="cal-nav">
+    <div class="cal-nav" id="calNav">
       <div class="nav-btn-group">
         <button class="nav-btn" onclick="changeMonth(-1)">←</button>
         <button class="nav-btn" onclick="changeMonth(1)">→</button>
@@ -559,6 +576,11 @@
         </div>
         <div id="apSelectedWrap"></div>
         <span class="form-hint">선택하지 않으면 연결 없이 생성돼요</span>
+      </div>
+      <!-- 비고 (메모 모드에서 표시) -->
+      <div class="form-group" id="newNoteGroup" style="display:none;">
+        <label class="form-label">비고</label>
+        <textarea class="form-input" id="newNote" rows="3" placeholder="메모 내용을 입력하세요..." style="resize:vertical;"></textarea>
       </div>
       <div class="stats-hint" id="statsHint">📊 Daily statistics 페이지에 자동 연결돼요</div>
       <div class="modal-footer">
@@ -783,7 +805,7 @@ function renderCalendar(dateMap){
   const din=new Date(viewYear,viewMonth,0).getDate();
   const isCur=viewYear===_today.y&&viewMonth===_today.m;
   const isPast=viewYear<_today.y||(viewYear===_today.y&&viewMonth<_today.m);
-  document.getElementById('monthProgress').style.width=`${((isCur?_today.d:isPast?din:0)/din*100).toFixed(1)}%`;
+  document.getElementById('monthProgressFill').style.width=`${((isCur?_today.d:isPast?din:0)/din*100).toFixed(1)}%`;
 
   const grid=document.getElementById('calGrid'); grid.innerHTML='';
   const firstDay=new Date(viewYear,viewMonth-1,1).getDay();
@@ -941,11 +963,19 @@ function renderDetail(todo, actionPlans){
   // 속성 그리드 rows
   const rows=[];
 
-  // 마감일
-  rows.push({label:'마감일', html: escHtml(fmtDate(todo.deadline)||'없음')});
+  // 마감일 — 날짜 클릭 편집 (날짜만, 시간 없음)
+  rows.push({label:'마감일', html: makeDateOnlyHtml('deadline', todo.deadline)});
 
   // 우선순위
   rows.push({label:'우선순위', html: priBadgeHtml(todo.priority)||'—'});
+
+  // 그룹모드 선택
+  const groupModeOptions = ['업무모드','성공모드/𝐒𝐈𝐃𝐄','루틴&나 돌보기','낭비시간/약속','계획外추가행동'];
+  const gmSelect = `<select class="detail-select" onchange="saveField('groupMode',this.value)">
+    <option value="">— 선택 —</option>
+    ${groupModeOptions.map(o=>`<option value="${escHtml(o)}"${todo.groupMode===o?' selected':''}>${escHtml(o)}</option>`).join('')}
+  </select>`;
+  rows.push({label:'그룹모드', html: gmSelect});
 
   // 소요시간
   rows.push({label:'소요시간', html: timeBlockHtml(todo.timeBlock)||'—'});
@@ -974,9 +1004,8 @@ function renderDetail(todo, actionPlans){
     </div>`
   });
 
-  // Start Time — datetime-local 클릭 편집
+  // Start Time
   rows.push({label:'Start', html: makeDtHtml('startTime', todo.startTime)});
-
   // End Time
   rows.push({label:'End', html: makeDtHtml('endTime', todo.endTime)});
 
@@ -1028,6 +1057,63 @@ function makeDtHtml(field, val){
   <input type="hidden" id="dt-hidden-${field}" value="${escHtml(val||'')}">`;
 }
 
+// 날짜만 편집 (마감일용 — 시간 없음)
+function makeDateOnlyHtml(field, val){
+  const display = val ? escHtml(fmtDate(val)) : '날짜 입력';
+  const cls = val ? '' : 'empty';
+  return `<button class="dt-trigger ${cls}" id="dt-btn-${field}" onclick="openDateOnlyPicker('${field}')">${display}</button>
+  <input type="hidden" id="dt-hidden-${field}" value="${escHtml(val||'')}">`;
+}
+
+function openDateOnlyPicker(field){
+  const hiddenEl = document.getElementById(`dt-hidden-${field}`);
+  const btnEl    = document.getElementById(`dt-btn-${field}`);
+  if (!hiddenEl || !btnEl) return;
+  if (_fpInstances[field]) { _fpInstances[field].destroy(); delete _fpInstances[field]; }
+
+  const rect = btnEl.getBoundingClientRect();
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;width:1px;height:1px;opacity:0;pointer-events:none;`;
+  document.body.appendChild(input);
+
+  const defaultDate = hiddenEl.value ? parseDate(hiddenEl.value) : null;
+  let pendingDate = null;
+
+  const fp = flatpickr(input, {
+    enableTime: false,
+    disableMobile: true,
+    defaultDate,
+    locale: {
+      firstDayOfWeek: 1,
+      weekdays: { shorthand: ['일','월','화','수','목','금','토'], longhand: ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'] },
+      months: { shorthand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], longhand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'] }
+    },
+    onChange(selectedDates){ pendingDate = selectedDates[0] || null; },
+    onReady(_d, _s, fp){
+      const footer = document.createElement('div');
+      footer.className = 'fp-footer';
+      footer.innerHTML = `<button class="fp-btn fp-btn-cancel">취소</button><button class="fp-btn fp-btn-save">저장</button>`;
+      footer.querySelector('.fp-btn-cancel').onclick = () => fp.close();
+      footer.querySelector('.fp-btn-save').onclick = () => {
+        if (pendingDate) {
+          const pad = v=>String(v).padStart(2,'0');
+          const dateStr = `${pendingDate.getFullYear()}-${pad(pendingDate.getMonth()+1)}-${pad(pendingDate.getDate())}`;
+          hiddenEl.value = dateStr;
+          btnEl.textContent = fmtDate(dateStr);
+          btnEl.classList.remove('empty');
+          saveField('deadline', dateStr);
+        }
+        fp.close();
+      };
+      fp.calendarContainer.appendChild(footer);
+    },
+    onClose(){ setTimeout(()=>{ input.remove(); delete _fpInstances[field]; }, 100); }
+  });
+  _fpInstances[field] = fp;
+  fp.open();
+}
+
 const _fpInstances = {};
 
 function openDtPicker(field){
@@ -1037,15 +1123,14 @@ function openDtPicker(field){
 
   if (_fpInstances[field]) { _fpInstances[field].destroy(); delete _fpInstances[field]; }
 
-  // 버튼 위치 기준으로 피커 앵커 input 생성
   const rect = btnEl.getBoundingClientRect();
   const input = document.createElement('input');
   input.type = 'text';
-  // 버튼 위치 근처에 배치 (Flatpickr가 이 위치 기준으로 팝업 띄움)
   input.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom + 4}px;width:1px;height:1px;opacity:0;pointer-events:none;`;
   document.body.appendChild(input);
 
   const defaultDate = notionValToLocalDate(hiddenEl.value) || null;
+  let pendingDate = null;
 
   const fp = flatpickr(input, {
     enableTime: true,
@@ -1059,29 +1144,33 @@ function openDtPicker(field){
       months: { shorthand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'], longhand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'] },
       amPM: ['오전','오후']
     },
-    onReady(_d, _s, fp) {
-      // 오전/오후 버튼을 시간 입력 왼쪽으로 이동
+    onChange(selectedDates){ pendingDate = selectedDates[0] || null; },
+    onReady(_d, _s, fp){
+      // 오전/오후 왼쪽 이동
       const timeContainer = fp.calendarContainer.querySelector('.flatpickr-time');
       if (timeContainer) {
         const amPmEl = timeContainer.querySelector('.flatpickr-am-pm');
-        const separator = timeContainer.querySelector('.flatpickr-time-separator');
-        if (amPmEl && separator) {
-          timeContainer.insertBefore(amPmEl, timeContainer.firstChild);
+        if (amPmEl) timeContainer.insertBefore(amPmEl, timeContainer.firstChild);
+      }
+      // 저장/취소 버튼 추가
+      const footer = document.createElement('div');
+      footer.className = 'fp-footer';
+      footer.innerHTML = `<button class="fp-btn fp-btn-cancel">취소</button><button class="fp-btn fp-btn-save">저장</button>`;
+      footer.querySelector('.fp-btn-cancel').onclick = () => fp.close();
+      footer.querySelector('.fp-btn-save').onclick = () => {
+        const d = pendingDate || (defaultDate ? defaultDate : null);
+        if (d) {
+          const kstISO = localDateToNotionKST(d);
+          hiddenEl.value = kstISO;
+          btnEl.textContent = fmtDateTime(kstISO);
+          btnEl.classList.remove('empty');
+          saveDt(field, kstISO);
         }
-      }
+        fp.close();
+      };
+      fp.calendarContainer.appendChild(footer);
     },
-    onClose(selectedDates) {
-      if (selectedDates.length) {
-        const d = selectedDates[0];
-        // KST offset +09:00 명시해서 노션에 저장 → 노션이 올바른 KST 시각으로 인식
-        const kstISO = localDateToNotionKST(d);
-        hiddenEl.value = kstISO;
-        btnEl.textContent = fmtDateTime(kstISO);
-        btnEl.classList.remove('empty');
-        saveDt(field, kstISO);
-      }
-      setTimeout(() => { input.remove(); delete _fpInstances[field]; }, 100);
-    }
+    onClose(){ setTimeout(()=>{ input.remove(); delete _fpInstances[field]; }, 100); }
   });
 
   _fpInstances[field] = fp;
@@ -1160,14 +1249,32 @@ async function handleEnd(){
   btn.disabled=true; btn.innerHTML=`<div class="spinner-sm"></div>`;
   try{
     const utcNow=nowKSTLocal();
+    const startTime=currentTodo.startTime;
+
+    // End Time + 상태 변경
     await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{status:'🌕Done',endTime:utcNow}});
     currentTodo.status='🌕Done'; currentTodo.endTime=utcNow;
     updateCache(currentTodo.id,{status:'🌕Done',endTime:utcNow});
     _refreshStatusBadge('🌕Done');
+
     const endBtn=document.getElementById('dt-btn-endTime');
     const endHidden=document.getElementById('dt-hidden-endTime');
     if(endBtn){endBtn.textContent=fmtDateTime(utcNow);endBtn.classList.remove('empty');}
     if(endHidden)endHidden.value=utcNow;
+
+    // Start Time이 있으면 데드라인을 Start~End 범위로 업데이트
+    if(startTime){
+      await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{
+        deadline: startTime,
+        deadlineEnd: utcNow
+      }});
+      currentTodo.deadline=startTime;
+      updateCache(currentTodo.id,{deadline:startTime});
+      // 마감일 표시 업데이트
+      const dlBtn=document.getElementById('dt-btn-deadline');
+      if(dlBtn){ dlBtn.textContent=fmtDate(startTime); dlBtn.classList.remove('empty'); }
+    }
+
     updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
     showToast('■ 완료됐어요');
   }catch(e){showToast('오류: '+e.message);}
@@ -1229,6 +1336,9 @@ function openCreateModal(isMemo){
   document.getElementById('apSearchInput').value='';
   document.getElementById('apSelectedWrap').innerHTML='';
   document.getElementById('apDropdown').classList.remove('open');
+  // 비고 칸: 메모 모드에서만 표시
+  document.getElementById('newNoteGroup').style.display=isMemo?'':'none';
+  if(document.getElementById('newNote')) document.getElementById('newNote').value='';
   document.querySelectorAll('.pri-select-btn').forEach(b=>b.classList.remove('active'));
   const btn=document.getElementById('createSubmitBtn');btn.disabled=false;btn.textContent='생성하기';
   document.getElementById('createOverlay').classList.add('open');
@@ -1278,23 +1388,98 @@ function clearAp(){selApId=null;document.getElementById('apSelectedWrap').innerH
 async function submitCreate(){
   const title=document.getElementById('newTitle').value.trim();
   const deadline=document.getElementById('newDeadline').value;
+  const note=document.getElementById('newNote')?.value.trim()||'';
   if(!title){showToast('제목을 입력해주세요');document.getElementById('newTitle').focus();return;}
   const btn=document.getElementById('createSubmitBtn');
   btn.disabled=true;btn.innerHTML=`<div class="spinner-sm"></div> 생성 중...`;
   try{
     await api({action:'createTodo'},{
-      title,priority:selPriVal,deadline:deadline||null,
+      title, priority:selPriVal, deadline:deadline||null,
       actionPlanId:createIsMemo?null:selApId,
-      isMemo:createIsMemo,est:30
+      isMemo:createIsMemo, est:30,
+      note: note||undefined
     });
     const[cy,cm]=deadline?deadline.split('-').map(Number):[viewYear,viewMonth];
     delete todoCache[`${cy}-${cm}`];
     closeCreate();
     showToast(createIsMemo?'📝 메모가 추가됐어요':'✅ 할일이 추가됐어요');
-    await loadAndRender();
+    if(currentMode==='memo') await loadMemoMode();
+    else await loadAndRender();
   }catch(e){showToast('오류: '+e.message);btn.disabled=false;btn.textContent='생성하기';}
 }
 document.getElementById('newTitle').addEventListener('keydown',e=>{if(e.key==='Enter')submitCreate();});
+
+// ══════════════════════════════════════════════════════
+// 모드 전환 (캘린더 ↔ 메모 목록)
+// ══════════════════════════════════════════════════════
+let currentMode = 'calendar'; // 'calendar' | 'memo'
+
+function toggleMode(){
+  currentMode = currentMode==='calendar' ? 'memo' : 'calendar';
+  const btn = document.getElementById('modeToggleBtn');
+  const calBody = document.getElementById('calBody');
+
+  if(currentMode==='memo'){
+    // 달력 그리드 숨기기
+    btn.style.opacity='1';
+    btn.title='캘린더 모드로 전환';
+    document.getElementById('monthProgress').style.display='none';
+    document.getElementById('calWeekdays').style.display='none';
+    document.getElementById('calGrid').style.display='none';
+    document.getElementById('calNav').style.display='none';
+    // 헤더 텍스트 변경
+    document.getElementById('selectedDayNum').textContent='📝';
+    document.getElementById('selectedMonthName').textContent='메모 목록';
+    loadMemoMode();
+  } else {
+    document.getElementById('monthProgress').style.display='';
+    document.getElementById('calWeekdays').style.display='';
+    document.getElementById('calGrid').style.display='';
+    document.getElementById('calNav').style.display='';
+    btn.title='메모 목록 보기';
+    loadAndRender();
+  }
+}
+
+async function loadMemoMode(){
+  document.getElementById('todoContainer').innerHTML=
+    `<div class="loading-state"><div class="spinner"></div><p style="font-size:12px;color:var(--text-3)">메모 불러오는 중...</p></div>`;
+  try{
+    const data=await api({action:'getMemos'});
+    renderMemoList(data.todos);
+  }catch(err){
+    document.getElementById('todoContainer').innerHTML=
+      `<div class="error-state">⚠️ 메모를 불러오지 못했어요.<br>${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderMemoList(todos){
+  const container=document.getElementById('todoContainer');
+  if(!todos.length){
+    container.innerHTML=`<div class="empty-state"><div class="empty-icon">📝</div><p>메모가 없어요</p></div>`;
+    return;
+  }
+  const list=document.createElement('div');list.className='todo-list';
+  todos.forEach(t=>{
+    const done=t.status?.includes('Done');
+    const prog=t.status?.includes('Progress');
+    const el=document.createElement('div');
+    el.className='todo-item'+(done?' is-done':prog?' is-progress':'');
+    const dateStr=t.deadline?fmtDate(t.deadline):(t.note?'':'날짜 없음');
+    el.innerHTML=`
+      <div class="todo-status-dot ${statusClass(t.status)}"></div>
+      <div class="todo-content">
+        <div class="todo-title">${escHtml(t.title)}</div>
+        <div class="todo-meta">
+          ${t.note?`<span style="font-size:11px;color:var(--text-3)">${escHtml(t.note.slice(0,40))}${t.note.length>40?'…':''}</span>`:''}
+          ${dateStr?`<span style="font-size:10px;color:var(--text-3);margin-left:auto">${escHtml(dateStr)}</span>`:''}
+        </div>
+      </div>`;
+    el.addEventListener('click',()=>openDetail(t));
+    list.appendChild(el);
+  });
+  container.innerHTML='';container.appendChild(list);
+}
 
 // ══════════════════════════════════════════════════════
 // 월 이동
