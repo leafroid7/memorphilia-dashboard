@@ -209,12 +209,12 @@
       cursor: pointer;
       transition: border-color 0.12s, background 0.12s, transform 0.1s;
     }
-    .todo-item:hover { background: var(--surface); border-color: var(--border-2); transform: translateX(2px); }
+    .todo-item:hover { background: var(--accent-bg); border-color: #b2dfd0; transform: translateX(2px); }
     /* 진행 중: 에메랄드 왼쪽 강조선 */
     .todo-item.is-progress { border-left: 2px solid var(--accent); }
     /* 완료: 확실한 비활성화 */
     .todo-item.is-done { opacity: 0.38; filter: grayscale(0.3); }
-    .todo-item.is-done:hover { opacity: 0.52; }
+    .todo-item.is-done:hover { opacity: 0.58; background: #d4ede6; transform: translateX(2px); }
 
     /* 상태 도트 */
     .todo-status-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
@@ -462,7 +462,7 @@
     .form-hint { font-size: 10px; color: var(--text-3); margin-top: 2px; }
 
     /* ── 프리셋 단축 버튼 ── */
-    .preset-section { margin-top: 8px; }
+    .preset-section { margin-top: 8px; margin-bottom: 12px; }
     .preset-section-label {
       font-size: 10px; font-weight: 600; color: var(--text-3);
       letter-spacing: 0.6px; text-transform: uppercase;
@@ -678,6 +678,13 @@
           <div class="preset-save-hint">버튼 이름만 편집 가능해요. 저장은 자동으로 돼요.</div>
         </div>
       </div>
+
+      <!-- 예상 소요시간 -->
+      <div class="form-group" id="newEstGroup">
+        <label class="form-label">예상 소요시간 (분)</label>
+        <input class="form-input" id="newEst" type="number" min="1" value="30" style="width:120px;">
+      </div>
+
       <!-- 비고 (메모 모드에서 표시) -->
       <div class="form-group" id="newNoteGroup" style="display:none;">
         <label class="form-label">비고</label>
@@ -1187,6 +1194,7 @@ function openDateOnlyPicker(field){
   const fp = flatpickr(input, {
     enableTime: false,
     disableMobile: true,
+    closeOnSelect: false,   // 날짜 클릭해도 자동으로 닫히지 않음 — 저장 버튼으로만 닫힘
     defaultDate,
     locale: {
       firstDayOfWeek: 1,
@@ -1470,6 +1478,7 @@ function openCreateModal(isMemo){
   document.getElementById('newDeadline').value=`${selectedDate.y}-${String(selectedDate.m).padStart(2,'0')}-${String(selectedDate.d).padStart(2,'0')}`;
   document.getElementById('apGroup').style.display=isMemo?'none':'';
   document.getElementById('presetSection').style.display=isMemo?'none':'';
+  document.getElementById('newEstGroup').style.display=isMemo?'none':'';
   document.getElementById('statsHint').style.display=isMemo?'none':'';
   document.getElementById('apSearchInput').value='';
   document.getElementById('apSelectedWrap').innerHTML='';
@@ -1650,9 +1659,11 @@ function applyPreset(idx) {
     document.getElementById('apSelectedWrap').innerHTML =
       `<div class="ap-selected-tag">${escHtml(p.apTitle)}<button onclick="clearAp()">✕</button></div>`;
 
-    // est. — 폼에 hidden으로 저장 (submitCreate에서 읽음)
-    // groupMode — 마찬가지
-    document.getElementById('newTitle').dataset.presetEst = p.est;
+    // est input 업데이트
+    const estInput = document.getElementById('newEst');
+    if (estInput) estInput.value = p.est;
+
+    // groupMode — dataset에 저장해서 submitCreate에서 읽음
     document.getElementById('newTitle').dataset.presetGroupMode = p.groupMode;
   }
 
@@ -1672,8 +1683,10 @@ async function submitCreate(){
   const title=titleEl.value.trim();
   const deadline=document.getElementById('newDeadline').value;
   const note=document.getElementById('newNote')?.value.trim()||'';
-  const presetEst = titleEl.dataset.presetEst ? Number(titleEl.dataset.presetEst) : null;
   const presetGroupMode = titleEl.dataset.presetGroupMode || null;
+  // est: newEst input에서 직접 읽음 (프리셋 적용 시 input 값도 업데이트됨)
+  const estInput = document.getElementById('newEst');
+  const est = estInput ? (Number(estInput.value) || 30) : 30;
   if(!title){showToast('제목을 입력해주세요');titleEl.focus();return;}
   const btn=document.getElementById('createSubmitBtn');
   btn.disabled=true;btn.innerHTML=`<div class="spinner-sm"></div> 생성 중...`;
@@ -1682,7 +1695,7 @@ async function submitCreate(){
       title, priority:selPriVal, deadline:deadline||null,
       actionPlanId:createIsMemo?null:selApId,
       isMemo:createIsMemo,
-      est: presetEst ?? 30,
+      est,
       note: note||undefined,
       groupMode: presetGroupMode||undefined
     });
