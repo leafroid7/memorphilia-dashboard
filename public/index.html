@@ -447,6 +447,57 @@
     .ap-selected-tag button { background: none; border: none; cursor: pointer; color: var(--accent); font-size: 11px; opacity: 0.6; }
     .ap-selected-tag button:hover { opacity: 1; }
     .form-hint { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+
+    /* ── 프리셋 단축 버튼 ── */
+    .preset-section { margin-top: 8px; }
+    .preset-section-label {
+      font-size: 10px; font-weight: 600; color: var(--text-3);
+      letter-spacing: 0.6px; text-transform: uppercase;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .preset-edit-toggle {
+      font-size: 10px; color: var(--accent); background: none; border: none;
+      cursor: pointer; font-family: 'DM Sans', sans-serif; font-weight: 500;
+      padding: 0; text-decoration: underline dotted;
+    }
+    .preset-btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+    .preset-btn {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 5px 11px; border-radius: 9999px;
+      font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
+      cursor: pointer; border: 1px solid var(--border-2);
+      background: var(--surface-2); color: var(--text-2);
+      transition: all 0.12s; white-space: nowrap;
+    }
+    .preset-btn:hover { background: var(--accent-bg); border-color: #b2dfd0; color: var(--accent); }
+    .preset-btn.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+    /* 프리셋 편집 패널 */
+    .preset-edit-panel {
+      display: none; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); overflow: hidden; margin-top: 6px;
+    }
+    .preset-edit-panel.open { display: block; }
+    .preset-edit-item {
+      display: grid; grid-template-columns: 24px 1fr auto;
+      align-items: center; gap: 8px;
+      padding: 8px 10px; border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .preset-edit-item:last-child { border-bottom: none; }
+    .preset-edit-num {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--surface-2); border: 1px solid var(--border-2);
+      font-size: 10px; font-weight: 600; color: var(--text-3);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .preset-edit-name {
+      font-size: 12px; color: var(--text-1); border: none; outline: none;
+      background: transparent; font-family: 'DM Sans', sans-serif;
+      width: 100%;
+    }
+    .preset-edit-name:focus { background: var(--surface-2); border-radius: 3px; padding: 1px 4px; }
+    .preset-save-hint { font-size: 10px; color: var(--text-3); padding: 6px 10px; background: var(--surface-2); }
     .stats-hint { font-size: 10px; color: var(--text-3); padding: 6px 8px; background: var(--surface-2); border-radius: var(--radius-xs); border: 1px solid var(--border); margin-bottom: 12px; }
 
     .toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--text-1); color: #fff; padding: 9px 18px; border-radius: 9999px; font-size: 12px; z-index: 300; animation: toastIn 0.18s ease; white-space: nowrap; border: 1px solid var(--border-2); }
@@ -590,6 +641,19 @@
         </div>
         <div id="apSelectedWrap"></div>
         <span class="form-hint">선택하지 않으면 연결 없이 생성돼요</span>
+      </div>
+
+      <!-- 프리셋 단축 버튼 (할일 모드) -->
+      <div class="preset-section" id="presetSection">
+        <div class="preset-section-label">
+          <span>빠른 입력</span>
+          <button class="preset-edit-toggle" onclick="togglePresetEdit()">편집</button>
+        </div>
+        <div class="preset-btn-row" id="presetBtnRow"></div>
+        <div class="preset-edit-panel" id="presetEditPanel">
+          <div id="presetEditItems"></div>
+          <div class="preset-save-hint">버튼 이름만 편집 가능해요. 저장은 자동으로 돼요.</div>
+        </div>
       </div>
       <!-- 비고 (메모 모드에서 표시) -->
       <div class="form-group" id="newNoteGroup" style="display:none;">
@@ -1342,23 +1406,29 @@ function _refreshStatusBadge(status){
 // ══════════════════════════════════════════════════════
 function openCreateModal(isMemo){
   createIsMemo=isMemo;selPriVal=null;selApId=null;
+  _activePresetIdx=null;
   document.getElementById('createTitle').textContent=isMemo?'새 메모':'새 할일';
   document.getElementById('createTopbar').className='modal-topbar '+(isMemo?'memo':'accent');
-  document.getElementById('newTitle').value='';
+  const titleEl=document.getElementById('newTitle');
+  titleEl.value='';
+  delete titleEl.dataset.presetEst;
+  delete titleEl.dataset.presetGroupMode;
   document.getElementById('newDeadline').value=`${selectedDate.y}-${String(selectedDate.m).padStart(2,'0')}-${String(selectedDate.d).padStart(2,'0')}`;
   document.getElementById('apGroup').style.display=isMemo?'none':'';
+  document.getElementById('presetSection').style.display=isMemo?'none':'';
   document.getElementById('statsHint').style.display=isMemo?'none':'';
   document.getElementById('apSearchInput').value='';
   document.getElementById('apSelectedWrap').innerHTML='';
   document.getElementById('apDropdown').classList.remove('open');
-  // 비고 칸: 메모 모드에서만 표시
+  document.getElementById('presetEditPanel').classList.remove('open');
   document.getElementById('newNoteGroup').style.display=isMemo?'':'none';
   if(document.getElementById('newNote')) document.getElementById('newNote').value='';
   document.querySelectorAll('.pri-select-btn').forEach(b=>b.classList.remove('active'));
   const btn=document.getElementById('createSubmitBtn');btn.disabled=false;btn.textContent='생성하기';
+  if(!isMemo) renderPresetButtons();
   document.getElementById('createOverlay').classList.add('open');
   document.body.style.overflow='hidden';
-  setTimeout(()=>document.getElementById('newTitle').focus(),100);
+  setTimeout(()=>titleEl.focus(),100);
 }
 function closeCreate(){document.getElementById('createOverlay').classList.remove('open');document.body.style.overflow='';}
 
@@ -1400,19 +1470,169 @@ $apIn.addEventListener('input',()=>{
 });
 function clearAp(){selApId=null;document.getElementById('apSelectedWrap').innerHTML='';}
 
-async function submitCreate(){
+// ══════════════════════════════════════════════════════
+// 프리셋 단축 버튼
+// ══════════════════════════════════════════════════════
+
+// 기본 프리셋 정의 (그룹모드 정확한 유니코드 포함)
+const DEFAULT_PRESETS = [
+  {
+    label: '운동 (1h)',
+    title: '운동 (1h)',
+    apId:  '2e5ec7e5-b9b0-8048-8f90-dc12f62ccef4',
+    apTitle: '2026 운동',
+    est: 60,
+    groupMode: '루틴&나 돌보기',
+    priority: '3️⃣𝗗𝗼 𝗹𝗮𝘁𝗲𝗿 (not urgent/hard)'
+  },
+  {
+    label: 'AI 스터디',
+    title: 'AI 스터디',
+    apId:  '33aec7e5-b9b0-8096-a0ef-f342dcf77053',
+    apTitle: 'AI 스터디',
+    est: 30,
+    groupMode: '성공모드/\uD835\uDC12\uD835\uDC08\uD835\uDC03\uD835\uDC04',
+    priority: '3️⃣𝗗𝗼 𝗹𝗮𝘁𝗲𝗿 (not urgent/hard)'
+  },
+  {
+    label: '개인 약속',
+    title: '개인 약속',
+    apId:  'cea55909-2136-486a-b101-ece33ea9658b',
+    apTitle: '개인 일정',
+    est: 60,
+    groupMode: '낭비시간/약속',
+    priority: '2️⃣𝗗𝗲𝗹𝗲𝗴𝗮𝘁𝗲 (urgent/easy)'
+  },
+  {
+    label: '계획적 딴짓',
+    title: 'new 딴짓',
+    apId:  '3abdfe30-792c-484a-adec-bab7d9474a07',
+    apTitle: '딴짓집합소',
+    est: 30,
+    groupMode: '낭비시간/약속',
+    priority: '2️⃣𝗗𝗲𝗹𝗲𝗴𝗮𝘁𝗲 (urgent/easy)'
+  }
+];
+
+// localStorage에서 라벨 커스텀만 불러오기
+function loadPresets() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('mempo_presets') || '[]');
+    return DEFAULT_PRESETS.map((p, i) => ({
+      ...p,
+      label: saved[i]?.label || p.label
+    }));
+  } catch { return DEFAULT_PRESETS; }
+}
+
+function savePresetLabels(labels) {
+  const data = DEFAULT_PRESETS.map((p, i) => ({ label: labels[i] || p.label }));
+  localStorage.setItem('mempo_presets', JSON.stringify(data));
+}
+
+let _activePresetIdx = null;
+
+function renderPresetButtons() {
+  const presets = loadPresets();
+  const row = document.getElementById('presetBtnRow');
+  const editItems = document.getElementById('presetEditItems');
+  if (!row || !editItems) return;
+
+  // 버튼 렌더
+  row.innerHTML = '';
+  presets.forEach((p, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn' + (_activePresetIdx === i ? ' active' : '');
+    btn.textContent = p.label;
+    btn.addEventListener('click', () => applyPreset(i));
+    row.appendChild(btn);
+  });
+
+  // 편집 아이템 렌더
+  editItems.innerHTML = '';
+  presets.forEach((p, i) => {
+    const item = document.createElement('div');
+    item.className = 'preset-edit-item';
+    item.innerHTML = `
+      <div class="preset-edit-num">${i + 1}</div>
+      <input class="preset-edit-name" type="text" value="${escHtml(p.label)}"
+        data-idx="${i}" placeholder="버튼 이름">
+      <span style="font-size:10px;color:var(--text-3);">${escHtml(p.apTitle)}</span>`;
+    const input = item.querySelector('input');
+    input.addEventListener('change', () => {
+      const labels = loadPresets().map(x => x.label);
+      labels[i] = input.value.trim() || DEFAULT_PRESETS[i].label;
+      savePresetLabels(labels);
+      renderPresetButtons();
+    });
+    editItems.appendChild(item);
+  });
+}
+
+function applyPreset(idx) {
+  const presets = loadPresets();
+  const p = presets[idx];
+  _activePresetIdx = (_activePresetIdx === idx) ? null : idx; // 토글
+
+  if (_activePresetIdx === null) {
+    // 해제: 폼 초기화
+    document.getElementById('newTitle').value = '';
+    selPriVal = null;
+    selApId = null;
+    document.getElementById('apSelectedWrap').innerHTML = '';
+    document.querySelectorAll('.pri-select-btn').forEach(b => b.classList.remove('active'));
+  } else {
+    // 적용
+    document.getElementById('newTitle').value = p.title;
+
+    // Priority 선택
+    selPriVal = p.priority;
+    document.querySelectorAll('.pri-select-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.val === p.priority);
+    });
+
+    // 액션 플랜
+    selApId = p.apId;
+    document.getElementById('apSelectedWrap').innerHTML =
+      `<div class="ap-selected-tag">${escHtml(p.apTitle)}<button onclick="clearAp()">✕</button></div>`;
+
+    // est. — 폼에 hidden으로 저장 (submitCreate에서 읽음)
+    // groupMode — 마찬가지
+    document.getElementById('newTitle').dataset.presetEst = p.est;
+    document.getElementById('newTitle').dataset.presetGroupMode = p.groupMode;
+  }
+
+  renderPresetButtons();
+}
+
+function togglePresetEdit() {
+  const panel = document.getElementById('presetEditPanel');
+  panel.classList.toggle('open');
+}
+
+// ══════════════════════════════════════════════════════
+// 생성 모달 초기화 시 프리셋 버튼 렌더
+// ══════════════════════════════════════════════════════
   const title=document.getElementById('newTitle').value.trim();
   const deadline=document.getElementById('newDeadline').value;
+  const titleEl=document.getElementById('newTitle');
+  const title=titleEl.value.trim();
+  const deadline=document.getElementById('newDeadline').value;
   const note=document.getElementById('newNote')?.value.trim()||'';
-  if(!title){showToast('제목을 입력해주세요');document.getElementById('newTitle').focus();return;}
+  // 프리셋에서 설정된 값 읽기
+  const presetEst = titleEl.dataset.presetEst ? Number(titleEl.dataset.presetEst) : null;
+  const presetGroupMode = titleEl.dataset.presetGroupMode || null;
+  if(!title){showToast('제목을 입력해주세요');titleEl.focus();return;}
   const btn=document.getElementById('createSubmitBtn');
   btn.disabled=true;btn.innerHTML=`<div class="spinner-sm"></div> 생성 중...`;
   try{
     await api({action:'createTodo'},{
       title, priority:selPriVal, deadline:deadline||null,
       actionPlanId:createIsMemo?null:selApId,
-      isMemo:createIsMemo, est:30,
-      note: note||undefined
+      isMemo:createIsMemo,
+      est: presetEst ?? 30,
+      note: note||undefined,
+      groupMode: presetGroupMode||undefined
     });
     const[cy,cm]=deadline?deadline.split('-').map(Number):[viewYear,viewMonth];
     delete todoCache[`${cy}-${cm}`];

@@ -84,16 +84,17 @@ module.exports = async (req, res) => {
 
     // ── createTodo ────────────────────────────────
     if (action === 'createTodo') {
-      const { title, priority, deadline, actionPlanId, isMemo, note, est } = req.body;
+      const { title, priority, deadline, actionPlanId, isMemo, note, est, groupMode } = req.body;
       if (!title?.trim()) return res.status(400).json({ error: '제목을 입력해주세요.' });
 
       const properties = {
         '리스트': { title: [{ text: { content: title.trim() } }] }
       };
-      if (deadline)       properties['데드라인']  = { date: { start: deadline } };
-      if (priority)       properties['𝑷𝒓𝒊𝒐𝒓𝒊𝒕𝒚'] = { select: { name: priority } };
-      if (note?.trim())   properties['비고']       = { rich_text: [{ text: { content: note.trim() } }] };
-      if (est != null)    properties['est.']       = { number: Number(est) };
+      if (deadline)         properties['데드라인']  = { date: { start: deadline } };
+      if (priority)         properties['𝑷𝒓𝒊𝒐𝒓𝒊𝒕𝒚'] = { select: { name: priority } };
+      if (note?.trim())     properties['비고']       = { rich_text: [{ text: { content: note.trim() } }] };
+      if (est != null)      properties['est.']       = { number: Number(est) };
+      if (groupMode?.trim()) properties['그룹\uD835\uDDFA\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2'] = { select: { name: groupMode.trim() } };
 
       const apRelation = isMemo ? [{ id: IMSI_MEMO_PAGE_ID }]
         : actionPlanId ? [{ id: actionPlanId }] : [];
