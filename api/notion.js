@@ -133,7 +133,7 @@ module.exports = async (req, res) => {
       }
 
       if (updates.groupMode !== undefined)
-        properties['그룹\uD835\uDDF4\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2'] = { select: updates.groupMode ? { name: updates.groupMode } : null };
+        properties['그룹\uD835\uDDFA\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2'] = { select: updates.groupMode ? { name: updates.groupMode } : null };
       if (updates.note !== undefined)
         properties['비고'] = { rich_text: [{ text: { content: updates.note || '' } }] };
       if (updates.est !== undefined)
@@ -177,7 +177,7 @@ function mapTodo(page) {
     deadline:  p['데드라인']?.date?.start || null,
     status:    p['🪐']?.status?.name || null,
     priority:  p['𝑷𝒓𝒊𝒐𝒓𝒊𝒕𝒚']?.select?.name || null,
-    groupMode: p['그룹\uD835\uDDF4\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2']?.select?.name || null,
+    groupMode: p['그룹\uD835\uDDFA\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2']?.select?.name || null,
     timeBlock: p['타임블록 요약']?.formula?.string || null,
     note:      p['비고']?.rich_text?.[0]?.plain_text || null,
     est:       p['est.']?.number ?? null,

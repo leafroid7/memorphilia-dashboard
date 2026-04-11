@@ -23,7 +23,11 @@
     .flatpickr-current-month { font-size: 14px; font-weight: 500; }
     .flatpickr-current-month select.flatpickr-monthDropdown-months { font-family: 'DM Sans', sans-serif; }
     .flatpickr-day { border-radius: 50%; font-size: 13px; color: #1a1714; }
-    .flatpickr-day.selected, .flatpickr-day.selected:hover { background: #00a878; border-color: #00a878; color: #fff; }
+    .flatpickr-day.selected, .flatpickr-day.selected:hover,
+    .flatpickr-day.selected:focus {
+      background: #00a878 !important; border-color: #00a878 !important;
+      color: #ffffff !important;
+    }
     .flatpickr-day.today { border-color: #00a878; color: #00a878; }
     .flatpickr-day.today:hover { background: #e8f7f2; }
     .flatpickr-day:hover { background: #f7f5f2; border-color: transparent; }
@@ -255,9 +259,9 @@
     .modal-overlay.open { display: flex; animation: fadeIn 0.16s ease; }
     @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
 
-    .modal { background: var(--surface); border-radius: 16px; border: 1px solid var(--border-2); box-shadow: var(--shadow-lg); width: 100%; max-width: 500px; animation: slideUp 0.18s ease; overflow: hidden; }
-    /* 제목 줄바꿈 — 가로 고정, 세로로 늘어남 */
-    .detail-title-text { font-family: 'DM Serif Display', serif; font-size: 17px; line-height: 1.4; color: var(--text-1); flex: 1; word-break: keep-all; overflow-wrap: break-word; white-space: normal; }
+    .modal { background: var(--surface); border-radius: 16px; border: 1px solid var(--border-2); box-shadow: var(--shadow-lg); width: 100%; max-width: 500px; animation: slideUp 0.18s ease; overflow: visible; }
+    /* 제목 줄바꿈 — 가로 500px 고정, 세로로 늘어남 */
+    .detail-title-text { font-family: 'DM Serif Display', serif; font-size: 17px; line-height: 1.4; color: var(--text-1); flex: 1; word-break: keep-all; overflow-wrap: break-word; white-space: normal; min-width: 0; max-width: 380px; }
     @keyframes slideUp { from { transform: translateY(10px); opacity:0; } to { transform: translateY(0); opacity:1; } }
 
     /* VoltAgent: 상단 컬러 바 — priority/accent 신호 */
@@ -269,7 +273,7 @@
     .modal-topbar.memo  { background: var(--text-3); }
     .modal-topbar.accent { background: var(--accent); }
 
-    .modal-body { padding: 22px 22px 18px; }
+    .modal-body { padding: 22px 22px 18px; border-radius: 0 0 16px 16px; overflow: hidden; background: var(--surface); }
     .modal-close { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 16px; line-height: 1; padding: 2px 4px; transition: color 0.12s; }
     .modal-close:hover { color: var(--text-1); }
 
@@ -1465,13 +1469,14 @@ function renderMemoList(todos){
     const prog=t.status?.includes('Progress');
     const el=document.createElement('div');
     el.className='todo-item'+(done?' is-done':prog?' is-progress':'');
-    const dateStr=t.deadline?fmtDate(t.deadline):(t.note?'':'날짜 없음');
+    const dateStr=t.deadline?fmtDate(t.deadline):'';
     el.innerHTML=`
       <div class="todo-status-dot ${statusClass(t.status)}"></div>
       <div class="todo-content">
         <div class="todo-title">${escHtml(t.title)}</div>
         <div class="todo-meta">
-          ${t.note?`<span style="font-size:11px;color:var(--text-3)">${escHtml(t.note.slice(0,40))}${t.note.length>40?'…':''}</span>`:''}
+          ${priBadgeHtml(t.priority)}
+          ${t.note?`<span style="font-size:11px;color:var(--text-3)">${escHtml(t.note.slice(0,30))}${t.note.length>30?'…':''}</span>`:''}
           ${dateStr?`<span style="font-size:10px;color:var(--text-3);margin-left:auto">${escHtml(dateStr)}</span>`:''}
         </div>
       </div>`;
