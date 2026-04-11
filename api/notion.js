@@ -180,18 +180,20 @@ module.exports = async (req, res) => {
 
 function mapTodo(page) {
   const p = page.properties;
+  const dl = p['데드라인']?.date;
   return {
-    id:        page.id,
-    title:     p['리스트']?.title?.[0]?.plain_text || '(제목 없음)',
-    deadline:  p['데드라인']?.date?.start || null,
-    status:    p['🪐']?.status?.name || null,
-    priority:  p['𝑷𝒓𝒊𝒐𝒓𝒊𝒕𝒚']?.select?.name || null,
-    groupMode: p['그룹\uD835\uDDFA\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2']?.select?.name || null,
-    timeBlock: p['타임블록 요약']?.formula?.string || null,
-    note:      p['비고']?.rich_text?.[0]?.plain_text || null,
-    est:       p['est.']?.number ?? null,
-    startTime: p['Start Time']?.date?.start || null,
-    endTime:   p['End Time']?.date?.start || null,
-    url:       page.url
+    id:          page.id,
+    title:       p['리스트']?.title?.[0]?.plain_text || '(제목 없음)',
+    deadline:    dl?.start || null,
+    deadlineEnd: dl?.end   || null,   // 기간 종료일 (있을 때만)
+    status:      p['🪐']?.status?.name || null,
+    priority:    p['𝑷𝒓𝒊𝒐𝒓𝒊𝒕𝒚']?.select?.name || null,
+    groupMode:   p['그룹\uD835\uDDFA\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2']?.select?.name || null,
+    timeBlock:   p['타임블록 요약']?.formula?.string || null,
+    note:        p['비고']?.rich_text?.[0]?.plain_text || null,
+    est:         p['est.']?.number ?? null,
+    startTime:   p['Start Time']?.date?.start || null,
+    endTime:     p['End Time']?.date?.start   || null,
+    url:         page.url
   };
 }

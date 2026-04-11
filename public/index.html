@@ -2,8 +2,15 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#1a1714">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="MEMORPHILIA">
   <title>MEMORPHILIA</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="apple-touch-icon" href="/icon-192.svg">
+  <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
@@ -11,13 +18,18 @@
   <style>
     /* Flatpickr 커스텀 테마 */
     .flatpickr-calendar { font-family: 'DM Sans', sans-serif; border-radius: 12px; border: 1px solid #d4cec8; box-shadow: 0 24px 80px rgba(0,0,0,0.28), 0 4px 16px rgba(0,0,0,0.12); background: #fff; }
-    /* Flatpickr 하단 저장/취소 버튼 */
-    .fp-footer { display: flex; gap: 6px; justify-content: flex-end; padding: 8px 12px; background: #f7f5f2; border-top: 1px solid #e2ddd8; border-radius: 0 0 12px 12px; }
+    /* Flatpickr 하단 저장/취소/삭제 버튼 */
+    .fp-footer { display: flex; gap: 6px; align-items: center; justify-content: flex-end; padding: 8px 12px; background: #f7f5f2; border-top: 1px solid #e2ddd8; border-radius: 0 0 12px 12px; }
     .fp-btn { padding: 5px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; border: none; transition: all 0.12s; }
     .fp-btn-cancel { background: #edeae4; color: #6b6560; }
     .fp-btn-cancel:hover { background: #e2ddd8; }
     .fp-btn-save { background: #00a878; color: #fff; }
     .fp-btn-save:hover { background: #008c64; }
+    .fp-btn-delete { background: none; color: #c0392b; font-size: 11px; padding: 5px 8px; border: 1px solid #e8b4b0; border-radius: 6px; margin-right: auto; }
+    .fp-btn-delete:hover { background: #fde8e6; }
+    /* 날짜 삭제 버튼 (인라인 ✕) */
+    .dt-del-btn { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: 12px; line-height: 1; padding: 2px 4px; border-radius: 4px; transition: color 0.12s, background 0.12s; flex-shrink: 0; }
+    .dt-del-btn:hover { color: var(--danger); background: #fde8e6; }
     .flatpickr-months { padding: 8px 0 4px; }
     .flatpickr-months .flatpickr-month, .flatpickr-current-month { color: #1a1714; }
     .flatpickr-current-month { font-size: 14px; font-weight: 500; }
@@ -1071,11 +1083,33 @@ function renderDetail(todo, actionPlans){
   // 속성 그리드 rows
   const rows=[];
 
-  // 마감일 — 날짜 클릭 편집 (날짜만, 시간 없음)
-  rows.push({label:'마감일', html: makeDateOnlyHtml('deadline', todo.deadline)});
+  // 마감일 — 날짜 클릭 편집 + 기간 표시
+  rows.push({label:'마감일', html: makeDeadlineHtml(todo.deadline, todo.deadlineEnd)});
 
-  // 우선순위
-  rows.push({label:'우선순위', html: priBadgeHtml(todo.priority)||'—'});
+  // 우선순위 — 클릭해서 변경 가능한 드롭다운
+  const priOpts = [
+    {val:'1️⃣𝗗𝗼 𝗻𝗼𝘄 (urgent/hard)',    n:'1', t:'Do now'},
+    {val:'2️⃣𝗗𝗲𝗹𝗲𝗴𝗮𝘁𝗲 (urgent/easy)',  n:'2', t:'Delegate'},
+    {val:'3️⃣𝗗𝗼 𝗹𝗮𝘁𝗲𝗿 (not urgent/hard)',n:'3', t:'Do later'},
+    {val:'4️⃣𝗗𝗲𝗹𝗲𝘁𝗲 (not urgent/easy)', n:'4', t:'Delete'},
+  ];
+  const priDropdownHtml = `
+    <div style="position:relative;display:inline-block;">
+      <div style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="togglePriDropdown()">
+        ${priBadgeHtml(todo.priority)||'<span style="font-size:12px;color:var(--text-3)">— 선택 —</span>'}
+        <span style="font-size:10px;color:var(--text-3)">▾</span>
+      </div>
+      <div id="priDropdown" style="display:none;position:absolute;top:calc(100%+4px);left:0;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);z-index:300;min-width:160px;overflow:hidden;">
+        <div class="pri-dd-item" style="padding:6px 10px;font-size:11px;color:var(--text-3);cursor:pointer;border-bottom:1px solid var(--border);" onclick="savePriority(null)">— 없음</div>
+        ${priOpts.map(o=>`
+          <div class="pri-dd-item" style="padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;" onclick="savePriority('${o.val}')">
+            <span class="badge-priority badge-priority-${o.n}" style="pointer-events:none;">
+              <span class="pri-num">${o.n}</span><span class="pri-divider"></span><span class="pri-label">${o.t}</span>
+            </span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  rows.push({label:'우선순위', html: priDropdownHtml});
 
   // 그룹모드 선택
   const groupModeOptions = ['업무모드','성공모드/𝐒𝐈𝐃𝐄','루틴&나 돌보기','낭비시간/약속','계획外추가행동'];
@@ -1161,8 +1195,35 @@ function renderDetail(todo, actionPlans){
 function makeDtHtml(field, val){
   const display = val ? escHtml(fmtDateTime(val)) : '날짜·시간 입력';
   const cls = val ? '' : 'empty';
-  return `<button class="dt-trigger ${cls}" id="dt-btn-${field}" onclick="openDtPicker('${field}')">${display}</button>
+  return `<div style="display:flex;align-items:center;gap:6px;">
+    <button class="dt-trigger ${cls}" id="dt-btn-${field}" onclick="openDtPicker('${field}')">${display}</button>
+    ${val?`<button class="dt-del-btn" onclick="clearDt('${field}')" title="삭제">✕</button>`:''}
+  </div>
   <input type="hidden" id="dt-hidden-${field}" value="${escHtml(val||'')}">`;
+}
+
+// 마감일 표시 — 날짜만 / 날짜+시간 / 기간(start~end) 자동 판단
+function makeDeadlineHtml(start, end){
+  let display = '날짜 입력';
+  let cls = 'empty';
+  if(start){
+    cls = '';
+    const hasTime = start.includes('T') && start.length > 10;
+    if(end){
+      // 기간 표시
+      const s = hasTime ? fmtDateTime(start) : fmtDate(start);
+      const endHasTime = end.includes('T') && end.length > 10;
+      const e = endHasTime ? fmtDateTime(end) : fmtDate(end);
+      display = `${s} → ${e}`;
+    } else {
+      display = hasTime ? fmtDateTime(start) : fmtDate(start);
+    }
+  }
+  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <button class="dt-trigger ${cls}" id="dt-btn-deadline" onclick="openDateOnlyPicker('deadline')">${escHtml(display)}</button>
+    ${start?`<button class="dt-del-btn" onclick="clearDeadline()" title="삭제">✕</button>`:''}
+  </div>
+  <input type="hidden" id="dt-hidden-deadline" value="${escHtml(start||'')}">`;
 }
 
 // Flatpickr 인스턴스 저장 — openDateOnlyPicker, openDtPicker 모두 사용
@@ -1194,7 +1255,7 @@ function openDateOnlyPicker(field){
   const fp = flatpickr(input, {
     enableTime: false,
     disableMobile: true,
-    closeOnSelect: false,   // 날짜 클릭해도 자동으로 닫히지 않음 — 저장 버튼으로만 닫힘
+    closeOnSelect: false,
     defaultDate,
     locale: {
       firstDayOfWeek: 1,
@@ -1205,7 +1266,8 @@ function openDateOnlyPicker(field){
     onReady(_d, _s, fp){
       const footer = document.createElement('div');
       footer.className = 'fp-footer';
-      footer.innerHTML = `<button class="fp-btn fp-btn-cancel">취소</button><button class="fp-btn fp-btn-save">저장</button>`;
+      footer.innerHTML = `<button class="fp-btn fp-btn-delete">삭제</button><span style="flex:1"></span><button class="fp-btn fp-btn-cancel">취소</button><button class="fp-btn fp-btn-save">저장</button>`;
+      footer.querySelector('.fp-btn-delete').onclick = () => { clearDeadline(); fp.close(); };
       footer.querySelector('.fp-btn-cancel').onclick = () => fp.close();
       footer.querySelector('.fp-btn-save').onclick = () => {
         if (pendingDate) {
@@ -1215,6 +1277,8 @@ function openDateOnlyPicker(field){
           btnEl.textContent = fmtDate(dateStr);
           btnEl.classList.remove('empty');
           saveField('deadline', dateStr);
+          currentTodo.deadline = dateStr;
+          currentTodo.deadlineEnd = null;
         }
         fp.close();
       };
@@ -1256,24 +1320,31 @@ function openDtPicker(field){
     },
     onChange(selectedDates){ pendingDate = selectedDates[0] || null; },
     onReady(_d, _s, fp){
-      // 오전/오후 왼쪽 이동
       const timeContainer = fp.calendarContainer.querySelector('.flatpickr-time');
       if (timeContainer) {
         const amPmEl = timeContainer.querySelector('.flatpickr-am-pm');
         if (amPmEl) timeContainer.insertBefore(amPmEl, timeContainer.firstChild);
       }
-      // 저장/취소 버튼 추가
       const footer = document.createElement('div');
       footer.className = 'fp-footer';
-      footer.innerHTML = `<button class="fp-btn fp-btn-cancel">취소</button><button class="fp-btn fp-btn-save">저장</button>`;
+      footer.innerHTML = `<button class="fp-btn fp-btn-delete">삭제</button><span style="flex:1"></span><button class="fp-btn fp-btn-cancel">취소</button><button class="fp-btn fp-btn-save">저장</button>`;
+      footer.querySelector('.fp-btn-delete').onclick = () => { clearDt(field); fp.close(); };
       footer.querySelector('.fp-btn-cancel').onclick = () => fp.close();
       footer.querySelector('.fp-btn-save').onclick = () => {
         const d = pendingDate || (defaultDate ? defaultDate : null);
         if (d) {
           const kstISO = localDateToNotionKST(d);
           hiddenEl.value = kstISO;
+          // 버튼 텍스트 + 삭제 버튼 표시 업데이트
+          const wrap = btnEl.parentElement;
           btnEl.textContent = fmtDateTime(kstISO);
           btnEl.classList.remove('empty');
+          if(wrap && !wrap.querySelector('.dt-del-btn')){
+            const delBtn = document.createElement('button');
+            delBtn.className='dt-del-btn'; delBtn.title='삭제'; delBtn.textContent='✕';
+            delBtn.onclick=()=>clearDt(field);
+            wrap.appendChild(delBtn);
+          }
           saveDt(field, kstISO);
         }
         fp.close();
@@ -1287,6 +1358,40 @@ function openDtPicker(field){
   fp.open();
 }
 
+// 날짜+시간 삭제
+async function clearDt(field){
+  if(!currentTodo)return;
+  const btn=document.getElementById(`dt-btn-${field}`);
+  const hidden=document.getElementById(`dt-hidden-${field}`);
+  const updates = field==='startTime'?{startTime:null}:{endTime:null};
+  try{
+    await api({action:'updateTodo'},{pageId:currentTodo.id,updates});
+    currentTodo[field]=null;
+    updateCache(currentTodo.id,{[field]:null});
+    if(btn){ btn.textContent='날짜·시간 입력'; btn.classList.add('empty'); }
+    if(hidden) hidden.value='';
+    // 삭제 버튼도 제거
+    const delBtn = btn?.parentElement?.querySelector('.dt-del-btn');
+    if(delBtn) delBtn.remove();
+    showToast('삭제됐어요');
+  }catch(e){showToast('삭제 실패: '+e.message);}
+}
+
+// 마감일 삭제
+async function clearDeadline(){
+  if(!currentTodo)return;
+  try{
+    await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{deadline:null}});
+    currentTodo.deadline=null; currentTodo.deadlineEnd=null;
+    updateCache(currentTodo.id,{deadline:null,deadlineEnd:null});
+    const btn=document.getElementById('dt-btn-deadline');
+    if(btn){ btn.textContent='날짜 입력'; btn.classList.add('empty'); }
+    const delBtn=btn?.parentElement?.querySelector('.dt-del-btn');
+    if(delBtn)delBtn.remove();
+    showToast('마감일이 삭제됐어요');
+  }catch(e){showToast('삭제 실패: '+e.message);}
+}
+
 async function saveDt(field, val){
   if(!currentTodo) return;
   const updates = field==='startTime' ? {startTime:val} : {endTime:val};
@@ -1296,6 +1401,48 @@ async function saveDt(field, val){
     updateCache(currentTodo.id,{[field]:val});
     showToast('저장됐어요');
   }catch(e){showToast('저장 실패: '+e.message);}
+}
+
+// 우선순위 드롭다운
+function togglePriDropdown(){
+  const dd=document.getElementById('priDropdown');
+  if(!dd)return;
+  dd.style.display=dd.style.display==='none'?'block':'none';
+}
+document.addEventListener('click',e=>{
+  const priWrap=document.getElementById('priDropdown')?.parentElement;
+  if(priWrap&&!priWrap.contains(e.target)){
+    const dd=document.getElementById('priDropdown');
+    if(dd)dd.style.display='none';
+  }
+});
+
+async function savePriority(val){
+  if(!currentTodo)return;
+  const dd=document.getElementById('priDropdown');
+  if(dd)dd.style.display='none';
+  try{
+    await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{priority:val}});
+    currentTodo.priority=val;
+    updateCache(currentTodo.id,{priority:val});
+    // topbar 색상 업데이트
+    const n=priNum(val);
+    document.getElementById('detailTopbar').className='modal-topbar'+(n?` pri-${n}`:'');
+    // 배지 표시 업데이트 (드롭다운 트리거 부분만)
+    const trigger=document.getElementById('priDropdown')?.previousElementSibling;
+    if(trigger){
+      const badgeSpan=trigger.querySelector('.badge-priority');
+      if(badgeSpan){
+        // 새 배지로 교체
+        const newBadge=document.createElement('span');
+        newBadge.innerHTML=priBadgeHtml(val);
+        badgeSpan.replaceWith(newBadge.firstChild||document.createTextNode('— 없음'));
+      } else if(val){
+        trigger.innerHTML=priBadgeHtml(val)+'<span style="font-size:10px;color:var(--text-3)">▾</span>';
+      }
+    }
+    showToast('우선순위가 변경됐어요');
+  }catch(e){showToast('변경 실패: '+e.message);}
 }
 
 async function saveField(field, val){
@@ -1410,10 +1557,11 @@ async function handleEnd(){
         deadlineEnd: utcNow
       }});
       currentTodo.deadline=startTime;
-      updateCache(currentTodo.id,{deadline:startTime});
-      // 마감일 표시 업데이트
-      const dlBtn=document.getElementById('dt-btn-deadline');
-      if(dlBtn){ dlBtn.textContent=fmtDate(startTime); dlBtn.classList.remove('empty'); }
+      currentTodo.deadlineEnd=utcNow;
+      updateCache(currentTodo.id,{deadline:startTime,deadlineEnd:utcNow});
+      // 마감일 셀 전체를 makeDeadlineHtml로 업데이트
+      const dlCell=document.getElementById('dt-btn-deadline')?.closest('.detail-value');
+      if(dlCell) dlCell.innerHTML=makeDeadlineHtml(startTime, utcNow);
     }
 
     updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
@@ -1812,6 +1960,13 @@ async function loadAndRender(){
   }
 }
 loadAndRender();
+
+// PWA 서비스 워커 등록
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
 </script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </body>
