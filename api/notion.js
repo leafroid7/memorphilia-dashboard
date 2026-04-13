@@ -185,11 +185,14 @@ function mapTodo(page) {
     id:          page.id,
     title:       p['리스트']?.title?.[0]?.plain_text || '(제목 없음)',
     deadline:    dl?.start || null,
-    deadlineEnd: dl?.end   || null,   // 기간 종료일 (있을 때만)
+    deadlineEnd: dl?.end   || null,
     status:      p['🪐']?.status?.name || null,
     priority:    p['𝑷𝒓𝒊𝒐𝒓𝒊𝒕𝒚']?.select?.name || null,
     groupMode:   p['그룹\uD835\uDDFA\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2']?.select?.name || null,
-    timeBlock:   p['타임블록 요약']?.formula?.string || null,
+    // 소요시간: 타임블록(𝗵) (표시) = 파란 메인, Tracker = 회색 서브
+    timeBlockH:  p['타임블록(\uD835\uDDF5) (표시)']?.formula?.string || null,
+    tracker:     p['Tracker']?.formula?.string || null,
+    timeBlock:   p['타임블록 요약']?.formula?.string || null, // 하위호환 유지
     note:        p['비고']?.rich_text?.[0]?.plain_text || null,
     est:         p['est.']?.number ?? null,
     startTime:   p['Start Time']?.date?.start || null,

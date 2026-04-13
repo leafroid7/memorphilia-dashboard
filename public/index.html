@@ -367,7 +367,15 @@
     .detail-dt-empty:hover { color: var(--accent); }
 
     /* 액션 플랜 태그 + 편집 */
-    .ap-tag { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 9999px; background: var(--accent-bg); border: 1px solid #b2dfd0; font-size: 11px; color: var(--accent); }
+    /* 그룹모드 배지 */
+    .gm-badge { display: inline-flex; align-items: center; padding: 2px 9px; border-radius: 9999px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+    /* 그룹모드 선택 버튼 (생성 모달) */
+    .gm-select-group { display: flex; flex-wrap: wrap; gap: 5px; }
+    .gm-select-btn { padding: 3px 10px; border-radius: 9999px; font-size: 11px; font-weight: 500; cursor: pointer; transition: opacity 0.12s, box-shadow 0.12s; opacity: 0.6; font-family: 'DM Sans', sans-serif; }
+    .gm-select-btn:hover { opacity: 0.85; }
+    .gm-select-btn.active { opacity: 1; box-shadow: 0 0 0 2px var(--text-1); }
+    /* 마감일 토글 라벨 */
+    .dl-toggle-label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
     /* 그룹모드 select */
     .detail-select {
       font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--text-2);
@@ -678,6 +686,12 @@
         <span class="form-hint">선택하지 않으면 연결 없이 생성돼요</span>
       </div>
 
+      <!-- 그룹모드 -->
+      <div class="form-group">
+        <label class="form-label">그룹모드</label>
+        <div class="gm-select-group" id="gmSelectGroup"></div>
+      </div>
+
       <!-- 프리셋 단축 버튼 (할일 모드) -->
       <div class="preset-section" id="presetSection">
         <div class="preset-section-label">
@@ -807,7 +821,7 @@ let viewYear=_today.y, viewMonth=_today.m;
 let selectedDate={..._today};
 const todoCache={};
 let currentTodo=null;
-let createIsMemo=false, selPriVal=null, selApId=null;
+let createIsMemo=false, selPriVal=null, selApId=null, selGmVal=null;
 let apDebounce=null, searchDebounce=null, detailApDebounce=null;
 const searchCache={};
 
@@ -1005,11 +1019,34 @@ function priBadgeHtml(p){
   if(!n)return'';
   return`<span class="badge-priority badge-priority-${n}"><span class="pri-num">${n}</span><span class="pri-divider"></span><span class="pri-label">${t}</span></span>`;
 }
-function timeBlockHtml(tb){
-  if(!tb)return'';
-  const m=tb.match(/^(\d[\d.]* h)\s*(\(.*\))?$/);
-  if(m) return`<span class="badge-time"><span class="time-main">⏱ ${escHtml(m[1])}</span>${m[2]?`<span class="time-sub"> ${escHtml(m[2])}</span>`:''}</span>`;
-  return`<span class="badge-time"><span class="time-main">⏱ ${escHtml(tb)}</span></span>`;
+// 소요시간: timeBlockH(파란) + tracker(회색) 조합
+function timeBlockHtml(tb, timeBlockH, tracker){
+  // 새 방식: timeBlockH + tracker 우선
+  if(timeBlockH || tracker){
+    const main = timeBlockH ? `<span class="time-main">⏱ ${escHtml(timeBlockH)}</span>` : '';
+    const sub  = tracker    ? `<span class="time-sub"> ${escHtml(tracker)}</span>`        : '';
+    if(!main && !sub) return '';
+    return `<span class="badge-time">${main}${sub}</span>`;
+  }
+  // 구버전 fallback: 타임블록 요약
+  if(!tb) return '';
+  const m = tb.match(/^(\d[\d.]* h)\s*(\(.*\))?$/);
+  if(m) return `<span class="badge-time"><span class="time-main">⏱ ${escHtml(m[1])}</span>${m[2]?`<span class="time-sub"> ${escHtml(m[2])}</span>`:''}</span>`;
+  return `<span class="badge-time"><span class="time-main">⏱ ${escHtml(tb)}</span></span>`;
+}
+
+// 그룹모드 배지 — 노션 선택 속성 배경색 매핑
+const GROUP_MODE_STYLES = {
+  '업무모드':        {bg:'#dbeafe', color:'#1e40af', label:'업무모드'},
+  '성공모드/𝐒𝐈𝐃𝐄':  {bg:'#fce7f3', color:'#9d174d', label:'성공모드/SIDE'},
+  '루틴&나 돌보기':  {bg:'#dcfce7', color:'#166534', label:'루틴&나 돌보기'},
+  '낭비시간/약속':   {bg:'#fef9c3', color:'#854d0e', label:'낭비시간/약속'},
+  '계획外추가행동':  {bg:'#f3e8ff', color:'#6b21a8', label:'계획外추가행동'},
+};
+function groupModeBadgeHtml(gm){
+  if(!gm) return '';
+  const s = GROUP_MODE_STYLES[gm] || {bg:'#f0ede8', color:'#6b6560', label: gm};
+  return `<span class="gm-badge" style="background:${s.bg};color:${s.color};">${escHtml(s.label)}</span>`;
 }
 
 // ══════════════════════════════════════════════════════
@@ -1041,7 +1078,7 @@ function makeTodoItem(t){
     <div class="todo-status-dot ${statusClass(t.status)}"></div>
     <div class="todo-content">
       <div class="todo-title${done?' done-title':''}">${escHtml(t.title)}</div>
-      <div class="todo-meta">${priBadgeHtml(t.priority)}${timeBlockHtml(t.timeBlock)}</div>
+      <div class="todo-meta">${priBadgeHtml(t.priority)}${timeBlockHtml(t.timeBlock, t.timeBlockH, t.tracker)}</div>
     </div>`;
   el.addEventListener('click',()=>openDetail(t));
   return el;
@@ -1111,16 +1148,26 @@ function renderDetail(todo, actionPlans){
     </div>`;
   rows.push({label:'우선순위', html: priDropdownHtml});
 
-  // 그룹모드 선택
-  const groupModeOptions = ['업무모드','성공모드/𝐒𝐈𝐃𝐄','루틴&나 돌보기','낭비시간/약속','계획外추가행동'];
-  const gmSelect = `<select class="detail-select" onchange="saveField('groupMode',this.value)">
-    <option value="">— 선택 —</option>
-    ${groupModeOptions.map(o=>`<option value="${escHtml(o)}"${todo.groupMode===o?' selected':''}>${escHtml(o)}</option>`).join('')}
-  </select>`;
-  rows.push({label:'그룹모드', html: gmSelect});
+  // 그룹모드 — 배지 드롭다운
+  const gmOpts = Object.entries(GROUP_MODE_STYLES);
+  const gmDropdownHtml = `
+    <div style="position:relative;display:inline-block;">
+      <div style="cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="toggleGmDropdown()">
+        ${groupModeBadgeHtml(todo.groupMode)||'<span style="font-size:12px;color:var(--text-3)">— 선택 —</span>'}
+        <span style="font-size:10px;color:var(--text-3)">▾</span>
+      </div>
+      <div id="gmDropdown" style="display:none;position:absolute;top:calc(100%+4px);left:0;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);z-index:300;min-width:170px;overflow:hidden;">
+        <div style="padding:6px 10px;font-size:11px;color:var(--text-3);cursor:pointer;border-bottom:1px solid var(--border);" onclick="saveGm(null)">— 없음</div>
+        ${gmOpts.map(([key,s])=>`
+          <div style="padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border);" onclick="saveGm('${escHtml(key)}')">
+            <span class="gm-badge" style="background:${s.bg};color:${s.color};">${escHtml(s.label)}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  rows.push({label:'그룹모드', html: gmDropdownHtml});
 
   // 소요시간
-  rows.push({label:'소요시간', html: timeBlockHtml(todo.timeBlock)||'—'});
+  rows.push({label:'소요시간', html: timeBlockHtml(todo.timeBlock, todo.timeBlockH, todo.tracker)||'—'});
 
   // 예상(분) — 인라인 편집
   rows.push({label:'예상(분)', html:
@@ -1192,38 +1239,171 @@ function renderDetail(todo, actionPlans){
   document.getElementById('btnEnd').disabled=false;
 }
 
+// Start/End Time HTML — 삭제버튼 항상 컨테이너 포함
 function makeDtHtml(field, val){
   const display = val ? escHtml(fmtDateTime(val)) : '날짜·시간 입력';
   const cls = val ? '' : 'empty';
-  return `<div style="display:flex;align-items:center;gap:6px;">
+  // 삭제 버튼: 값 있을 때만 표시, 없을 때는 투명 자리 유지 (DOM 재생성 없이 show/hide)
+  return `<div class="dt-wrap" id="dt-wrap-${field}" style="display:flex;align-items:center;gap:6px;">
     <button class="dt-trigger ${cls}" id="dt-btn-${field}" onclick="openDtPicker('${field}')">${display}</button>
-    ${val?`<button class="dt-del-btn" onclick="clearDt('${field}')" title="삭제">✕</button>`:''}
+    <button class="dt-del-btn" id="dt-del-${field}" onclick="clearDt('${field}')" title="삭제" style="display:${val?'inline-flex':'none'};">✕</button>
   </div>
   <input type="hidden" id="dt-hidden-${field}" value="${escHtml(val||'')}">`;
 }
 
-// 마감일 표시 — 날짜만 / 날짜+시간 / 기간(start~end) 자동 판단
+// 마감일 표시 — 날짜 기본, 시간/종료일 토글 방식
 function makeDeadlineHtml(start, end){
+  // 현재 상태 파악
+  const hasTime = start && /T\d{2}:\d{2}/.test(start);
+  const hasEnd  = !!end;
+
   let display = '날짜 입력';
   let cls = 'empty';
   if(start){
     cls = '';
-    const hasTime = start.includes('T') && start.length > 10;
-    if(end){
-      // 기간 표시
+    if(hasEnd){
       const s = hasTime ? fmtDateTime(start) : fmtDate(start);
-      const endHasTime = end.includes('T') && end.length > 10;
-      const e = endHasTime ? fmtDateTime(end) : fmtDate(end);
+      const eHasTime = end && /T\d{2}:\d{2}/.test(end);
+      const e = eHasTime ? fmtDateTime(end) : fmtDate(end);
       display = `${s} → ${e}`;
     } else {
       display = hasTime ? fmtDateTime(start) : fmtDate(start);
     }
   }
-  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-    <button class="dt-trigger ${cls}" id="dt-btn-deadline" onclick="openDateOnlyPicker('deadline')">${escHtml(display)}</button>
-    ${start?`<button class="dt-del-btn" onclick="clearDeadline()" title="삭제">✕</button>`:''}
-  </div>
-  <input type="hidden" id="dt-hidden-deadline" value="${escHtml(start||'')}">`;
+
+  return `<div style="width:100%">
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+      <button class="dt-trigger ${cls}" id="dt-btn-deadline" onclick="openDeadlinePicker()">${escHtml(display)}</button>
+      ${start?`<button class="dt-del-btn" onclick="clearDeadline()" title="삭제">✕</button>`:''}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <label class="dl-toggle-label">
+        <input type="checkbox" id="dl-toggle-time" ${hasTime?'checked':''} onchange="onDeadlineToggle()"
+          style="accent-color:var(--accent);width:13px;height:13px;cursor:pointer;">
+        <span style="font-size:11px;color:var(--text-2);">시간 포함</span>
+      </label>
+      <label class="dl-toggle-label">
+        <input type="checkbox" id="dl-toggle-end" ${hasEnd?'checked':''} onchange="onDeadlineToggle()"
+          style="accent-color:var(--accent);width:13px;height:13px;cursor:pointer;">
+        <span style="font-size:11px;color:var(--text-2);">종료일 포함</span>
+      </label>
+    </div>
+    <input type="hidden" id="dt-hidden-deadline"    value="${escHtml(start||'')}">
+    <input type="hidden" id="dt-hidden-deadlineEnd" value="${escHtml(end||'')}">
+  </div>`;
+}
+
+// 마감일 피커 열기 — 토글 상태 읽어서 모드 결정
+function openDeadlinePicker(){
+  const showTime = document.getElementById('dl-toggle-time')?.checked || false;
+  const showEnd  = document.getElementById('dl-toggle-end')?.checked  || false;
+  const hiddenStart = document.getElementById('dt-hidden-deadline');
+  const hiddenEnd   = document.getElementById('dt-hidden-deadlineEnd');
+  const btnEl       = document.getElementById('dt-btn-deadline');
+  if(!hiddenStart || !btnEl) return;
+
+  const field = 'deadline';
+  if(_fpInstances[field]){ _fpInstances[field].destroy(); delete _fpInstances[field]; }
+
+  const rect = btnEl.getBoundingClientRect();
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;width:1px;height:1px;opacity:0;pointer-events:none;`;
+  document.body.appendChild(input);
+
+  const defaultDate = hiddenStart.value ? parseDate(hiddenStart.value) : null;
+  let pendingDates = [];
+
+  const fp = flatpickr(input, {
+    enableTime: showTime,
+    time_24hr: false,
+    mode: showEnd ? 'range' : 'single',
+    disableMobile: true,
+    closeOnSelect: false,
+    defaultDate: showEnd && hiddenEnd.value
+      ? [defaultDate, parseDate(hiddenEnd.value)]
+      : defaultDate,
+    locale: {
+      firstDayOfWeek: 1,
+      weekdays: { shorthand:['일','월','화','수','목','금','토'], longhand:['일요일','월요일','화요일','수요일','목요일','금요일','토요일'] },
+      months:   { shorthand:['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
+                  longhand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'] },
+      amPM: ['오전','오후'],
+      rangeSeparator: ' → '
+    },
+    onChange(dates){ pendingDates = dates; },
+    onReady(_d, _s, fp){
+      if(showTime){
+        const tc = fp.calendarContainer.querySelector('.flatpickr-time');
+        if(tc){ const ap=tc.querySelector('.flatpickr-am-pm'); if(ap) tc.insertBefore(ap,tc.firstChild); }
+      }
+      const footer = document.createElement('div');
+      footer.className = 'fp-footer';
+      footer.innerHTML = `<button class="fp-btn fp-btn-delete">삭제</button><span style="flex:1"></span><button class="fp-btn fp-btn-cancel">취소</button><button class="fp-btn fp-btn-save">저장</button>`;
+      footer.querySelector('.fp-btn-delete').onclick = () => { clearDeadline(); fp.close(); };
+      footer.querySelector('.fp-btn-cancel').onclick = () => fp.close();
+      footer.querySelector('.fp-btn-save').onclick = () => {
+        const dates = pendingDates.length ? pendingDates : (defaultDate ? [defaultDate] : []);
+        if(dates.length){
+          const pad = v=>String(v).padStart(2,'0');
+          const fmt = d => {
+            if(!showTime) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+            return localDateToNotionKST(d);
+          };
+          const startVal = fmt(dates[0]);
+          const endVal   = (showEnd && dates[1]) ? fmt(dates[1]) : null;
+
+          hiddenStart.value = startVal;
+          if(hiddenEnd) hiddenEnd.value = endVal || '';
+
+          // 노션 저장 — deadline + deadlineEnd 함께
+          if(currentTodo){
+            const updates = { deadline: startVal };
+            if(endVal) updates.deadlineEnd = endVal;
+            api({action:'updateTodo'},{pageId:currentTodo.id, updates}).then(()=>{
+              currentTodo.deadline = startVal;
+              currentTodo.deadlineEnd = endVal;
+              updateCache(currentTodo.id,{deadline:startVal, deadlineEnd:endVal});
+            });
+          }
+
+          // 버튼 텍스트 업데이트
+          let dispStart = showTime ? fmtDateTime(startVal) : fmtDate(startVal);
+          let dispText  = endVal ? `${dispStart} → ${showTime?fmtDateTime(endVal):fmtDate(endVal)}` : dispStart;
+          btnEl.textContent = dispText;
+          btnEl.classList.remove('empty');
+
+          // 삭제 버튼 없으면 추가
+          const wrap = btnEl.parentElement;
+          if(wrap && !wrap.querySelector('.dt-del-btn')){
+            const db = document.createElement('button');
+            db.className='dt-del-btn'; db.title='삭제'; db.textContent='✕';
+            db.onclick = clearDeadline;
+            wrap.appendChild(db);
+          }
+        }
+        fp.close();
+      };
+      fp.calendarContainer.appendChild(footer);
+    },
+    onClose(){ setTimeout(()=>{ input.remove(); delete _fpInstances[field]; },100); }
+  });
+  _fpInstances[field] = fp;
+  fp.open();
+}
+
+// 토글 변경 시 — 현재 값 유지하면서 버튼 텍스트만 업데이트
+function onDeadlineToggle(){
+  const showTime = document.getElementById('dl-toggle-time')?.checked || false;
+  const showEnd  = document.getElementById('dl-toggle-end')?.checked  || false;
+  const start    = document.getElementById('dt-hidden-deadline')?.value || '';
+  const end      = document.getElementById('dt-hidden-deadlineEnd')?.value || '';
+  const btn      = document.getElementById('dt-btn-deadline');
+  if(!btn || !start) return;
+  // 표시 텍스트만 갱신
+  const dispStart = showTime ? fmtDateTime(start) : fmtDate(start);
+  const dispEnd   = (showEnd && end) ? (showTime ? fmtDateTime(end) : fmtDate(end)) : null;
+  btn.textContent = dispEnd ? `${dispStart} → ${dispEnd}` : dispStart;
 }
 
 // Flatpickr 인스턴스 저장 — openDateOnlyPicker, openDtPicker 모두 사용
@@ -1335,16 +1515,11 @@ function openDtPicker(field){
         if (d) {
           const kstISO = localDateToNotionKST(d);
           hiddenEl.value = kstISO;
-          // 버튼 텍스트 + 삭제 버튼 표시 업데이트
-          const wrap = btnEl.parentElement;
           btnEl.textContent = fmtDateTime(kstISO);
           btnEl.classList.remove('empty');
-          if(wrap && !wrap.querySelector('.dt-del-btn')){
-            const delBtn = document.createElement('button');
-            delBtn.className='dt-del-btn'; delBtn.title='삭제'; delBtn.textContent='✕';
-            delBtn.onclick=()=>clearDt(field);
-            wrap.appendChild(delBtn);
-          }
+          // 삭제 버튼 show (id 방식)
+          const delBtn = document.getElementById(`dt-del-${field}`);
+          if(delBtn) delBtn.style.display = 'inline-flex';
           saveDt(field, kstISO);
         }
         fp.close();
@@ -1358,21 +1533,20 @@ function openDtPicker(field){
   fp.open();
 }
 
-// 날짜+시간 삭제
+// 날짜+시간 삭제 — DOM 제거 없이 show/hide로 처리 (4번 버그 수정)
 async function clearDt(field){
   if(!currentTodo)return;
-  const btn=document.getElementById(`dt-btn-${field}`);
-  const hidden=document.getElementById(`dt-hidden-${field}`);
-  const updates = field==='startTime'?{startTime:null}:{endTime:null};
+  const btn    = document.getElementById(`dt-btn-${field}`);
+  const hidden = document.getElementById(`dt-hidden-${field}`);
+  const delBtn = document.getElementById(`dt-del-${field}`);
+  const updates = field==='startTime' ? {startTime:null} : {endTime:null};
   try{
     await api({action:'updateTodo'},{pageId:currentTodo.id,updates});
     currentTodo[field]=null;
     updateCache(currentTodo.id,{[field]:null});
     if(btn){ btn.textContent='날짜·시간 입력'; btn.classList.add('empty'); }
     if(hidden) hidden.value='';
-    // 삭제 버튼도 제거
-    const delBtn = btn?.parentElement?.querySelector('.dt-del-btn');
-    if(delBtn) delBtn.remove();
+    if(delBtn) delBtn.style.display='none';  // DOM 제거 대신 숨김
     showToast('삭제됐어요');
   }catch(e){showToast('삭제 실패: '+e.message);}
 }
@@ -1413,6 +1587,11 @@ document.addEventListener('click',e=>{
   const priWrap=document.getElementById('priDropdown')?.parentElement;
   if(priWrap&&!priWrap.contains(e.target)){
     const dd=document.getElementById('priDropdown');
+    if(dd)dd.style.display='none';
+  }
+  const gmWrap=document.getElementById('gmDropdown')?.parentElement;
+  if(gmWrap&&!gmWrap.contains(e.target)){
+    const dd=document.getElementById('gmDropdown');
     if(dd)dd.style.display='none';
   }
 });
@@ -1585,6 +1764,32 @@ document.addEventListener('click',e=>{
   }
 });
 
+function toggleGmDropdown(){
+  const dd=document.getElementById('gmDropdown');
+  if(!dd)return;
+  dd.style.display=dd.style.display==='none'?'block':'none';
+}
+
+async function saveGm(val){
+  if(!currentTodo)return;
+  const dd=document.getElementById('gmDropdown');
+  if(dd)dd.style.display='none';
+  try{
+    await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{groupMode:val}});
+    currentTodo.groupMode=val;
+    updateCache(currentTodo.id,{groupMode:val});
+    // 트리거 배지 업데이트
+    const trigger=document.getElementById('gmDropdown')?.previousElementSibling;
+    if(trigger){
+      const badge=trigger.querySelector('.gm-badge');
+      const newHtml = val ? groupModeBadgeHtml(val) : '<span style="font-size:12px;color:var(--text-3)">— 선택 —</span>';
+      if(badge) badge.outerHTML=newHtml;
+      else trigger.innerHTML=newHtml+'<span style="font-size:10px;color:var(--text-3)">▾</span>';
+    }
+    showToast('그룹모드가 변경됐어요');
+  }catch(e){showToast('변경 실패: '+e.message);}
+}
+
 async function changeStatus(newStatus){
   if(!currentTodo)return;
   const dd=document.getElementById('statusDropdown');
@@ -1594,7 +1799,6 @@ async function changeStatus(newStatus){
     currentTodo.status=newStatus;
     updateCache(currentTodo.id,{status:newStatus});
     _refreshStatusBadge(newStatus);
-    // topbar, dot도 업데이트
     document.getElementById('detailDot').className='detail-status-dot '+statusClass(newStatus);
     updatePanel(selectedDate.y,selectedDate.m,selectedDate.d);
     showToast('상태가 변경됐어요');
@@ -1635,6 +1839,16 @@ function openCreateModal(isMemo){
   document.getElementById('newNoteGroup').style.display=isMemo?'':'none';
   if(document.getElementById('newNote')) document.getElementById('newNote').value='';
   document.querySelectorAll('.pri-select-btn').forEach(b=>b.classList.remove('active'));
+  // 그룹모드 버튼 렌더링 & 초기화
+  selGmVal=null;
+  const gmGroup=document.getElementById('gmSelectGroup');
+  if(gmGroup){
+    gmGroup.innerHTML=Object.entries(GROUP_MODE_STYLES).map(([key,s])=>
+      `<button class="gm-select-btn" data-val="${key}"
+        style="background:${s.bg};color:${s.color};border:1px solid ${s.color}40;"
+        onclick="selGm(this)">${s.label}</button>`
+    ).join('');
+  }
   const btn=document.getElementById('createSubmitBtn');btn.disabled=false;btn.textContent='생성하기';
   if(!isMemo) renderPresetButtons();
   document.getElementById('createOverlay').classList.add('open');
@@ -1644,6 +1858,13 @@ function openCreateModal(isMemo){
 function closeCreate(){document.getElementById('createOverlay').classList.remove('open');document.body.style.overflow='';}
 
 function handleOvClick(e,id){if(e.target===document.getElementById(id)){if(id==='detailOverlay')closeDetail();else closeCreate();}}
+
+function selGm(btn){
+  const was=btn.classList.contains('active');
+  document.querySelectorAll('.gm-select-btn').forEach(b=>b.classList.remove('active'));
+  if(!was){ btn.classList.add('active'); selGmVal=btn.dataset.val; }
+  else selGmVal=null;
+}
 
 function selPri(btn){
   const was=btn.classList.contains('active');
@@ -1845,7 +2066,7 @@ async function submitCreate(){
       isMemo:createIsMemo,
       est,
       note: note||undefined,
-      groupMode: presetGroupMode||undefined
+      groupMode: selGmVal||presetGroupMode||undefined
     });
     const[cy,cm]=deadline?deadline.split('-').map(Number):[viewYear,viewMonth];
     delete todoCache[`${cy}-${cm}`];
