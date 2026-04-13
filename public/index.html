@@ -1040,8 +1040,8 @@ const GROUP_MODE_STYLES = {
   '업무모드':        {bg:'#dbeafe', color:'#1e40af', label:'업무모드'},
   '성공모드/𝐒𝐈𝐃𝐄':  {bg:'#fce7f3', color:'#9d174d', label:'성공모드/SIDE'},
   '루틴&나 돌보기':  {bg:'#dcfce7', color:'#166534', label:'루틴&나 돌보기'},
-  '낭비시간/약속':   {bg:'#fef9c3', color:'#854d0e', label:'낭비시간/약속'},
-  '계획外추가행동':  {bg:'#f3e8ff', color:'#6b21a8', label:'계획外추가행동'},
+  '낭비시간/약속':   {bg:'#f3e8ff', color:'#6b21a8', label:'낭비시간/약속'},
+  '계획外추가행동':  {bg:'#f1efe8', color:'#5f5e5a', label:'계획外추가행동'},
 };
 function groupModeBadgeHtml(gm){
   if(!gm) return '';
@@ -1088,7 +1088,10 @@ function makeTodoItem(t){
 // 상세 모달
 // ══════════════════════════════════════════════════════
 async function openDetail(todo){
-  currentTodo={...todo};
+  // 캐시 최신값 우선 (삭제 후 재오픈 시 정확한 값 반영)
+  const allCached = Object.values(todoCache).flat();
+  const cached = allCached.find(t=>t.id===todo.id);
+  currentTodo={...(cached||todo)};
   document.getElementById('detailOverlay').classList.add('open');
   document.body.style.overflow='hidden';
   renderDetail(currentTodo,[]);
@@ -1179,13 +1182,13 @@ function renderDetail(todo, actionPlans){
     `<textarea class="detail-editable" id="detailNote" rows="2" placeholder="메모..." onblur="saveField('note',this.value)">${escHtml(todo.note||'')}</textarea>`
   });
 
-  // 액션 플랜 — 표시 + 편집
+  // 액션 플랜 — 배지 표시 + 편집
   const apDisplay = actionPlans.length
-    ? actionPlans.map(ap=>`<span class="ap-tag">${ap.icon?ap.icon+' ':''}${escHtml(ap.title)}</span>`).join('')
+    ? actionPlans.map(ap=>`<span class="ap-tag">${ap.icon?escHtml(ap.icon)+' ':''}${escHtml(ap.title)}</span>`).join(' ')
     : '';
   rows.push({label:'액션플랜', html:
     `<div style="width:100%">
-      <div id="detailApTags" style="margin-bottom:${actionPlans.length?'6px':'0'}">${apDisplay}</div>
+      <div id="detailApTags" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:${actionPlans.length?'6px':'0'}">${apDisplay}</div>
       <div class="ap-edit-wrap">
         <input class="ap-edit-input" id="detailApInput" type="text" placeholder="검색하여 변경..." autocomplete="off">
         <div class="ap-edit-dropdown" id="detailApDropdown"></div>
@@ -1251,162 +1254,199 @@ function makeDtHtml(field, val){
   <input type="hidden" id="dt-hidden-${field}" value="${escHtml(val||'')}">`;
 }
 
-// 마감일 표시 — 날짜 기본, 시간/종료일 토글 방식
+// 마감일 표시 — 날짜 기본, 커스텀 피커로 열림
 function makeDeadlineHtml(start, end){
-  // 현재 상태 파악
   const hasTime = start && /T\d{2}:\d{2}/.test(start);
   const hasEnd  = !!end;
-
-  let display = '날짜 입력';
-  let cls = 'empty';
+  let display = '날짜 입력', cls = 'empty';
   if(start){
     cls = '';
     if(hasEnd){
-      const s = hasTime ? fmtDateTime(start) : fmtDate(start);
       const eHasTime = end && /T\d{2}:\d{2}/.test(end);
-      const e = eHasTime ? fmtDateTime(end) : fmtDate(end);
-      display = `${s} → ${e}`;
+      display = `${hasTime?fmtDateTime(start):fmtDate(start)} → ${eHasTime?fmtDateTime(end):fmtDate(end)}`;
     } else {
       display = hasTime ? fmtDateTime(start) : fmtDate(start);
     }
   }
-
-  return `<div style="width:100%">
-    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
-      <button class="dt-trigger ${cls}" id="dt-btn-deadline" onclick="openDeadlinePicker()">${escHtml(display)}</button>
-      ${start?`<button class="dt-del-btn" onclick="clearDeadline()" title="삭제">✕</button>`:''}
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-      <label class="dl-toggle-label">
-        <input type="checkbox" id="dl-toggle-time" ${hasTime?'checked':''} onchange="onDeadlineToggle()"
-          style="accent-color:var(--accent);width:13px;height:13px;cursor:pointer;">
-        <span style="font-size:11px;color:var(--text-2);">시간 포함</span>
-      </label>
-      <label class="dl-toggle-label">
-        <input type="checkbox" id="dl-toggle-end" ${hasEnd?'checked':''} onchange="onDeadlineToggle()"
-          style="accent-color:var(--accent);width:13px;height:13px;cursor:pointer;">
-        <span style="font-size:11px;color:var(--text-2);">종료일 포함</span>
-      </label>
-    </div>
+  return `<div style="width:100%;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+    <button class="dt-trigger ${cls}" id="dt-btn-deadline" onclick="openDeadlinePicker()">${escHtml(display)}</button>
+    <button class="dt-del-btn" id="dt-del-deadline" onclick="clearDeadline()" title="삭제" style="display:${start?'inline-flex':'none'};">✕</button>
     <input type="hidden" id="dt-hidden-deadline"    value="${escHtml(start||'')}">
     <input type="hidden" id="dt-hidden-deadlineEnd" value="${escHtml(end||'')}">
   </div>`;
 }
 
-// 마감일 피커 열기 — 토글 상태 읽어서 모드 결정
+// 커스텀 마감일 피커 — 인라인 폼 팝업
 function openDeadlinePicker(){
-  const showTime = document.getElementById('dl-toggle-time')?.checked || false;
-  const showEnd  = document.getElementById('dl-toggle-end')?.checked  || false;
-  const hiddenStart = document.getElementById('dt-hidden-deadline');
-  const hiddenEnd   = document.getElementById('dt-hidden-deadlineEnd');
-  const btnEl       = document.getElementById('dt-btn-deadline');
-  if(!hiddenStart || !btnEl) return;
+  if(document.getElementById('dl-picker-popup')) return; // 이미 열려있으면 무시
 
-  const field = 'deadline';
-  if(_fpInstances[field]){ _fpInstances[field].destroy(); delete _fpInstances[field]; }
+  const btnEl = document.getElementById('dt-btn-deadline');
+  if(!btnEl) return;
 
+  const curStart = document.getElementById('dt-hidden-deadline')?.value || '';
+  const curEnd   = document.getElementById('dt-hidden-deadlineEnd')?.value || '';
+
+  // 기존값 파싱
+  const parseLocal = iso => {
+    if(!iso) return {date:'',h:'',mi:'',ampm:'오전'};
+    const d = parseDate(iso);
+    if(!d) return {date:'',h:'',mi:'',ampm:'오전'};
+    const pad = v=>String(v).padStart(2,'0');
+    const ymd = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const hrs = d.getHours();
+    const ampm = hrs < 12 ? '오전' : '오후';
+    const h12 = hrs === 0 ? 12 : hrs > 12 ? hrs-12 : hrs;
+    return {date:ymd, h:pad(h12), mi:pad(d.getMinutes()), ampm};
+  };
+  const sVal = parseLocal(curStart);
+  const eVal = parseLocal(curEnd);
+  const hasTime = !!curStart && /T\d{2}:\d{2}/.test(curStart);
+  const hasEnd  = !!curEnd;
+
+  // 팝업 생성
+  const popup = document.createElement('div');
+  popup.id = 'dl-picker-popup';
+  popup.style.cssText = `
+    position:fixed;z-index:9999;
+    background:var(--surface);border:1px solid var(--border-2);
+    border-radius:12px;box-shadow:0 24px 80px rgba(0,0,0,0.28),0 4px 16px rgba(0,0,0,0.12);
+    padding:16px;min-width:280px;max-width:320px;
+    font-family:'DM Sans',sans-serif;font-size:13px;
+  `;
+
+  // 위치 계산
   const rect = btnEl.getBoundingClientRect();
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.bottom+4}px;width:1px;height:1px;opacity:0;pointer-events:none;`;
-  document.body.appendChild(input);
+  const top = Math.min(rect.bottom + 6, window.innerHeight - 420);
+  const left = Math.min(rect.left, window.innerWidth - 330);
+  popup.style.top  = `${top}px`;
+  popup.style.left = `${left}px`;
 
-  const defaultDate = hiddenStart.value ? parseDate(hiddenStart.value) : null;
-  let pendingDates = [];
+  const render = () => {
+    const showTime = popup.querySelector('#dl-chk-time')?.checked ?? hasTime;
+    const showEnd  = popup.querySelector('#dl-chk-end')?.checked  ?? hasEnd;
+    const sDate = popup.querySelector('#dl-s-date')?.value || sVal.date;
+    const sH    = popup.querySelector('#dl-s-h')?.value    || sVal.h || '09';
+    const sMi   = popup.querySelector('#dl-s-mi')?.value   || sVal.mi || '00';
+    const sAP   = popup.querySelector('#dl-s-ap')?.value   || sVal.ampm;
+    const eDate = popup.querySelector('#dl-e-date')?.value || eVal.date || sDate;
+    const eH    = popup.querySelector('#dl-e-h')?.value    || eVal.h || '10';
+    const eMi   = popup.querySelector('#dl-e-mi')?.value   || eVal.mi || '00';
+    const eAP   = popup.querySelector('#dl-e-ap')?.value   || eVal.ampm;
 
-  const fp = flatpickr(input, {
-    enableTime: showTime,
-    time_24hr: false,
-    mode: showEnd ? 'range' : 'single',
-    disableMobile: true,
-    closeOnSelect: false,
-    defaultDate: showEnd && hiddenEnd.value
-      ? [defaultDate, parseDate(hiddenEnd.value)]
-      : defaultDate,
-    locale: {
-      firstDayOfWeek: 1,
-      weekdays: { shorthand:['일','월','화','수','목','금','토'], longhand:['일요일','월요일','화요일','수요일','목요일','금요일','토요일'] },
-      months:   { shorthand:['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'],
-                  longhand: ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'] },
-      amPM: ['오전','오후'],
-      rangeSeparator: ' → '
-    },
-    onChange(dates){ pendingDates = dates; },
-    onReady(_d, _s, fp){
-      if(showTime){
-        const tc = fp.calendarContainer.querySelector('.flatpickr-time');
-        if(tc){ const ap=tc.querySelector('.flatpickr-am-pm'); if(ap) tc.insertBefore(ap,tc.firstChild); }
-      }
-      const footer = document.createElement('div');
-      footer.className = 'fp-footer';
-      footer.innerHTML = `<button class="fp-btn fp-btn-delete">삭제</button><span style="flex:1"></span><button class="fp-btn fp-btn-cancel">취소</button><button class="fp-btn fp-btn-save">저장</button>`;
-      footer.querySelector('.fp-btn-delete').onclick = () => { clearDeadline(); fp.close(); };
-      footer.querySelector('.fp-btn-cancel').onclick = () => fp.close();
-      footer.querySelector('.fp-btn-save').onclick = () => {
-        const dates = pendingDates.length ? pendingDates : (defaultDate ? [defaultDate] : []);
-        if(dates.length){
-          const pad = v=>String(v).padStart(2,'0');
-          const fmt = d => {
-            if(!showTime) return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-            return localDateToNotionKST(d);
-          };
-          const startVal = fmt(dates[0]);
-          const endVal   = (showEnd && dates[1]) ? fmt(dates[1]) : null;
+    popup.innerHTML = `
+      <div style="font-size:10px;font-weight:600;color:var(--text-3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;">시작일</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:${showTime?'8px':'12px'};">
+        <input id="dl-s-date" type="date" value="${sDate}" style="flex:1;padding:5px 8px;border:1px solid var(--border-2);border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface-2);color:var(--text-1);outline:none;">
+      </div>
+      ${showTime ? `<div style="display:flex;align-items:center;gap:5px;margin-bottom:12px;">
+        <select id="dl-s-ap" style="${selectStyle}">${['오전','오후'].map(v=>`<option${v===sAP?' selected':''}>${v}</option>`).join('')}</select>
+        <input id="dl-s-h"  type="number" min="1" max="12" value="${sH}"  style="${numStyle}" placeholder="시">
+        <span style="color:var(--text-2);font-weight:500;">:</span>
+        <input id="dl-s-mi" type="number" min="0" max="59" value="${sMi}" style="${numStyle}" placeholder="분">
+      </div>` : ''}
 
-          hiddenStart.value = startVal;
-          if(hiddenEnd) hiddenEnd.value = endVal || '';
+      ${showEnd ? `
+        <div style="height:1px;background:var(--border);margin-bottom:10px;"></div>
+        <div style="font-size:10px;font-weight:600;color:var(--text-3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px;">종료일</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:${showTime?'8px':'12px'};">
+          <input id="dl-e-date" type="date" value="${eDate}" style="flex:1;padding:5px 8px;border:1px solid var(--border-2);border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface-2);color:var(--text-1);outline:none;">
+        </div>
+        ${showTime ? `<div style="display:flex;align-items:center;gap:5px;margin-bottom:12px;">
+          <select id="dl-e-ap" style="${selectStyle}">${['오전','오후'].map(v=>`<option${v===eAP?' selected':''}>${v}</option>`).join('')}</select>
+          <input id="dl-e-h"  type="number" min="1" max="12" value="${eH}"  style="${numStyle}" placeholder="시">
+          <span style="color:var(--text-2);font-weight:500;">:</span>
+          <input id="dl-e-mi" type="number" min="0" max="59" value="${eMi}" style="${numStyle}" placeholder="분">
+        </div>` : ''}
+      ` : ''}
 
-          // 노션 저장 — deadline + deadlineEnd 함께
-          if(currentTodo){
-            const updates = { deadline: startVal };
-            if(endVal) updates.deadlineEnd = endVal;
-            api({action:'updateTodo'},{pageId:currentTodo.id, updates}).then(()=>{
-              currentTodo.deadline = startVal;
-              currentTodo.deadlineEnd = endVal;
-              updateCache(currentTodo.id,{deadline:startVal, deadlineEnd:endVal});
-            });
-          }
+      <div style="display:flex;gap:14px;margin-bottom:12px;padding-top:4px;">
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--text-2);">
+          <input id="dl-chk-time" type="checkbox" ${showTime?'checked':''} style="accent-color:#00a878;width:13px;height:13px;">
+          시간 포함
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;color:var(--text-2);">
+          <input id="dl-chk-end" type="checkbox" ${showEnd?'checked':''} style="accent-color:#00a878;width:13px;height:13px;">
+          종료일 포함
+        </label>
+      </div>
 
-          // 버튼 텍스트 업데이트
-          let dispStart = showTime ? fmtDateTime(startVal) : fmtDate(startVal);
-          let dispText  = endVal ? `${dispStart} → ${showTime?fmtDateTime(endVal):fmtDate(endVal)}` : dispStart;
-          btnEl.textContent = dispText;
-          btnEl.classList.remove('empty');
+      <div style="display:flex;gap:6px;align-items:center;padding-top:10px;border-top:1px solid var(--border);">
+        <button id="dl-btn-del" style="padding:5px 9px;border-radius:6px;font-size:11px;border:1px solid #e8b4b0;background:none;color:#c0392b;cursor:pointer;font-family:'DM Sans',sans-serif;margin-right:auto;">삭제</button>
+        <button id="dl-btn-cancel" style="padding:5px 13px;border-radius:6px;font-size:12px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-2);cursor:pointer;font-family:'DM Sans',sans-serif;">취소</button>
+        <button id="dl-btn-save" style="padding:5px 13px;border-radius:6px;font-size:12px;border:none;background:#00a878;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;">저장</button>
+      </div>`;
 
-          // 삭제 버튼 없으면 추가
-          const wrap = btnEl.parentElement;
-          if(wrap && !wrap.querySelector('.dt-del-btn')){
-            const db = document.createElement('button');
-            db.className='dt-del-btn'; db.title='삭제'; db.textContent='✕';
-            db.onclick = clearDeadline;
-            wrap.appendChild(db);
-          }
-        }
-        fp.close();
+    // 토글 변경 시 재렌더
+    popup.querySelector('#dl-chk-time').onchange = render;
+    popup.querySelector('#dl-chk-end').onchange  = render;
+
+    // 삭제
+    popup.querySelector('#dl-btn-del').onclick = () => { clearDeadline(); closePopup(); };
+
+    // 취소
+    popup.querySelector('#dl-btn-cancel').onclick = closePopup;
+
+    // 저장
+    popup.querySelector('#dl-btn-save').onclick = () => {
+      const showTimeNow = popup.querySelector('#dl-chk-time').checked;
+      const showEndNow  = popup.querySelector('#dl-chk-end').checked;
+      const sd = popup.querySelector('#dl-s-date').value;
+      if(!sd){ showToast('시작 날짜를 입력해주세요'); return; }
+
+      const toISO = (dateStr, hEl, miEl, apEl) => {
+        if(!showTimeNow) return dateStr;
+        let h  = parseInt(hEl?.value||'9');
+        const mi = parseInt(miEl?.value||'0');
+        const ap = apEl?.value || '오전';
+        if(ap==='오후' && h!==12) h+=12;
+        if(ap==='오전' && h===12) h=0;
+        const pad = v=>String(v).padStart(2,'0');
+        return `${dateStr}T${pad(h)}:${pad(mi)}:00+09:00`;
       };
-      fp.calendarContainer.appendChild(footer);
-    },
-    onClose(){ setTimeout(()=>{ input.remove(); delete _fpInstances[field]; },100); }
-  });
-  _fpInstances[field] = fp;
-  fp.open();
+
+      const startVal = toISO(sd,
+        popup.querySelector('#dl-s-h'), popup.querySelector('#dl-s-mi'), popup.querySelector('#dl-s-ap'));
+      const ed = showEndNow ? popup.querySelector('#dl-e-date')?.value : null;
+      const endVal = (showEndNow && ed)
+        ? toISO(ed, popup.querySelector('#dl-e-h'), popup.querySelector('#dl-e-mi'), popup.querySelector('#dl-e-ap'))
+        : null;
+
+      // 노션 저장
+      if(currentTodo){
+        const updates = {deadline: startVal};
+        if(endVal) updates.deadlineEnd = endVal;
+        else updates.deadlineEnd = null;
+        api({action:'updateTodo'},{pageId:currentTodo.id,updates}).then(()=>{
+          currentTodo.deadline = startVal;
+          currentTodo.deadlineEnd = endVal;
+          updateCache(currentTodo.id,{deadline:startVal,deadlineEnd:endVal});
+        });
+      }
+
+      // 표시 업데이트
+      const dlCell = document.getElementById('dt-btn-deadline')?.closest('.detail-value');
+      if(dlCell) dlCell.innerHTML = makeDeadlineHtml(startVal, endVal);
+
+      showToast('마감일이 저장됐어요');
+      closePopup();
+    };
+  };
+
+  const selectStyle = `padding:4px 6px;border:1px solid var(--border-2);border-radius:6px;font-size:12px;font-family:'DM Sans',sans-serif;background:var(--surface-2);color:var(--text-1);outline:none;cursor:pointer;`;
+  const numStyle    = `width:44px;padding:4px 6px;border:1px solid var(--border-2);border-radius:6px;font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;background:var(--surface-2);color:var(--text-1);outline:none;text-align:center;`;
+
+  const closePopup = () => { popup.remove(); document.removeEventListener('mousedown', outsideClick); };
+  const outsideClick = e => { if(!popup.contains(e.target) && e.target!==btnEl) closePopup(); };
+
+  render();
+  document.body.appendChild(popup);
+  setTimeout(()=>document.addEventListener('mousedown', outsideClick), 50);
 }
 
-// 토글 변경 시 — 현재 값 유지하면서 버튼 텍스트만 업데이트
-function onDeadlineToggle(){
-  const showTime = document.getElementById('dl-toggle-time')?.checked || false;
-  const showEnd  = document.getElementById('dl-toggle-end')?.checked  || false;
-  const start    = document.getElementById('dt-hidden-deadline')?.value || '';
-  const end      = document.getElementById('dt-hidden-deadlineEnd')?.value || '';
-  const btn      = document.getElementById('dt-btn-deadline');
-  if(!btn || !start) return;
-  // 표시 텍스트만 갱신
-  const dispStart = showTime ? fmtDateTime(start) : fmtDate(start);
-  const dispEnd   = (showEnd && end) ? (showTime ? fmtDateTime(end) : fmtDate(end)) : null;
-  btn.textContent = dispEnd ? `${dispStart} → ${dispEnd}` : dispStart;
-}
+// 토글 변경 시 (구 방식 호환용 — 현재는 render() 내부에서 처리)
+function onDeadlineToggle(){}
 
-// Flatpickr 인스턴스 저장 — openDateOnlyPicker, openDtPicker 모두 사용
+// Flatpickr 인스턴스 저장 — openDtPicker 사용
 const _fpInstances = {};
 
 // 날짜만 편집 (마감일용 — 시간 없음)
@@ -1533,20 +1573,21 @@ function openDtPicker(field){
   fp.open();
 }
 
-// 날짜+시간 삭제 — DOM 제거 없이 show/hide로 처리 (4번 버그 수정)
+// 날짜+시간 삭제
 async function clearDt(field){
   if(!currentTodo)return;
-  const btn    = document.getElementById(`dt-btn-${field}`);
-  const hidden = document.getElementById(`dt-hidden-${field}`);
-  const delBtn = document.getElementById(`dt-del-${field}`);
   const updates = field==='startTime' ? {startTime:null} : {endTime:null};
   try{
     await api({action:'updateTodo'},{pageId:currentTodo.id,updates});
     currentTodo[field]=null;
     updateCache(currentTodo.id,{[field]:null});
+    // DOM 직접 업데이트
+    const btn    = document.getElementById(`dt-btn-${field}`);
+    const hidden = document.getElementById(`dt-hidden-${field}`);
+    const delBtn = document.getElementById(`dt-del-${field}`);
     if(btn){ btn.textContent='날짜·시간 입력'; btn.classList.add('empty'); }
     if(hidden) hidden.value='';
-    if(delBtn) delBtn.style.display='none';  // DOM 제거 대신 숨김
+    if(delBtn) delBtn.style.display='none';
     showToast('삭제됐어요');
   }catch(e){showToast('삭제 실패: '+e.message);}
 }
@@ -1558,10 +1599,9 @@ async function clearDeadline(){
     await api({action:'updateTodo'},{pageId:currentTodo.id,updates:{deadline:null}});
     currentTodo.deadline=null; currentTodo.deadlineEnd=null;
     updateCache(currentTodo.id,{deadline:null,deadlineEnd:null});
-    const btn=document.getElementById('dt-btn-deadline');
-    if(btn){ btn.textContent='날짜 입력'; btn.classList.add('empty'); }
-    const delBtn=btn?.parentElement?.querySelector('.dt-del-btn');
-    if(delBtn)delBtn.remove();
+    // 마감일 셀 전체 재렌더
+    const dlCell=document.getElementById('dt-btn-deadline')?.closest('.detail-value');
+    if(dlCell) dlCell.innerHTML=makeDeadlineHtml(null,null);
     showToast('마감일이 삭제됐어요');
   }catch(e){showToast('삭제 실패: '+e.message);}
 }
