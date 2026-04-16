@@ -200,17 +200,24 @@
     .cal-tab-btn:hover { background: var(--accent-bg); color: var(--accent); }
 
     /* ══ 사이드 패널 ══ */
-    .panel-header { padding: 14px 16px 0; border-bottom: 1px solid var(--border); }
-    .panel-header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding-bottom: 10px; }
+    .panel-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+    /* PC: 날짜와 탭을 같은 줄에 — 기존 스타일 */
+    .panel-header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
     .panel-date { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--text-1); line-height: 1.2; }
     .panel-date strong { color: var(--accent); }
     .panel-subtitle { font-size: 11px; color: var(--text-3); margin-top: 3px; font-weight: 400; letter-spacing: 0.3px; }
-    /* 필터 탭 — 날짜와 완전히 분리된 독립 줄, 항상 전체 너비 */
-    .panel-filter-bar { display: flex; padding: 0 0 10px; }
-    .panel-filter-tabs { display: flex; gap: 3px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; border: 1px solid var(--border); }
-    .pf-tab { padding: 4px 14px; border-radius: 5px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; border: none; background: none; color: var(--text-3); cursor: pointer; transition: all 0.12s; white-space: nowrap; flex: 1; text-align: center; }
+    .panel-filter-bar { display: none; } /* PC에서는 숨김 — 탭은 panel-header-top 안에 있음 */
+    .panel-filter-tabs { display: flex; gap: 3px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; border: 1px solid var(--border); flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+    .pf-tab { padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; border: none; background: none; color: var(--text-3); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
     .pf-tab:hover { color: var(--text-2); }
     .pf-tab.active { background: var(--surface); color: var(--text-1); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    /* 모바일: 탭을 날짜 아래 독립 줄로 */
+    @media (max-width: 720px) {
+      .panel-filter-tabs-top { display: none !important; } /* PC용 탭 숨김 */
+      .panel-filter-bar { display: flex !important; padding-top: 10px; }
+      .panel-filter-bar .panel-filter-tabs { width: 100%; }
+      .panel-filter-bar .pf-tab { flex: 1; text-align: center; }
+    }
 
     /* Todo 목록 */
     .todo-list { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 5px; max-height: 540px; overflow-y: auto; }
@@ -609,12 +616,19 @@
           <div class="panel-date" id="panelDate"></div>
           <div class="panel-subtitle" id="panelSubtitle"></div>
         </div>
+        <!-- PC용 탭 (모바일에서 숨김) -->
+        <div class="panel-filter-tabs panel-filter-tabs-top" id="panelFilterTabs">
+          <button class="pf-tab active" data-filter="all"  onclick="setPanelFilter('all')">전체</button>
+          <button class="pf-tab"        data-filter="todo" onclick="setPanelFilter('todo')">할일</button>
+          <button class="pf-tab"        data-filter="memo" onclick="setPanelFilter('memo')">메모</button>
+        </div>
       </div>
+      <!-- 모바일용 탭 (PC에서 숨김) -->
       <div class="panel-filter-bar" id="panelFilterBar">
-        <div class="panel-filter-tabs" id="panelFilterTabs" style="width:100%;">
-          <button class="pf-tab active" data-filter="all"   onclick="setPanelFilter('all')">전체</button>
-          <button class="pf-tab"        data-filter="todo"  onclick="setPanelFilter('todo')">할일</button>
-          <button class="pf-tab"        data-filter="memo"  onclick="setPanelFilter('memo')">메모</button>
+        <div class="panel-filter-tabs" id="panelFilterTabsMobile">
+          <button class="pf-tab active" data-filter="all"  onclick="setPanelFilter('all')">전체</button>
+          <button class="pf-tab"        data-filter="todo" onclick="setPanelFilter('todo')">할일</button>
+          <button class="pf-tab"        data-filter="memo" onclick="setPanelFilter('memo')">메모</button>
         </div>
       </div>
     </div>
@@ -844,6 +858,16 @@ let panelFilter = 'all'; // 'all' | 'todo' | 'memo'
 let apDebounce=null, searchDebounce=null, detailApDebounce=null;
 const searchCache={};
 
+// 페이지 로드 즉시 오늘 날짜로 헤더 초기화 (loadAndRender 실행 전 빈 화면 방지)
+;(()=>{
+  const {y,m,d}=_today;
+  const WDAY=['일','월','화','수','목','금','토'];
+  const el=document.getElementById('panelDate');
+  const sl=document.getElementById('panelSubtitle');
+  if(el) el.innerHTML=`${y}년 ${m}월 <strong>${d}</strong>일`;
+  if(sl) sl.textContent=`${WDAY[new Date(y,m-1,d).getDay()]}요일`;
+})();
+
 // ══════════════════════════════════════════════════════
 // API
 // ══════════════════════════════════════════════════════
@@ -1014,6 +1038,7 @@ const memoCache = {};
 
 function setPanelFilter(filter){
   panelFilter = filter;
+  // PC탭 + 모바일탭 모두 동기화
   document.querySelectorAll('.pf-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.filter === filter);
   });
