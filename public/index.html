@@ -205,8 +205,10 @@
     .panel-date { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--text-1); line-height: 1.2; }
     .panel-date strong { color: var(--accent); }
     .panel-subtitle { font-size: 11px; color: var(--text-3); margin-top: 3px; font-weight: 400; letter-spacing: 0.3px; }
-    .panel-filter-tabs { display: flex; gap: 3px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; border: 1px solid var(--border); flex-shrink: 0; align-self: flex-start; }
-    .pf-tab { padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; border: none; background: none; color: var(--text-3); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+    /* 필터 탭 — 날짜와 완전히 분리된 독립 줄, 항상 전체 너비 */
+    .panel-filter-bar { display: flex; padding: 0 0 10px; }
+    .panel-filter-tabs { display: flex; gap: 3px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; border: 1px solid var(--border); }
+    .pf-tab { padding: 4px 14px; border-radius: 5px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; border: none; background: none; color: var(--text-3); cursor: pointer; transition: all 0.12s; white-space: nowrap; flex: 1; text-align: center; }
     .pf-tab:hover { color: var(--text-2); }
     .pf-tab.active { background: var(--surface); color: var(--text-1); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
@@ -604,10 +606,12 @@
     <div class="panel-header">
       <div class="panel-header-top">
         <div>
-          <div class="panel-date" id="panelDate">2026년 4월 <strong>11</strong>일</div>
-          <div class="panel-subtitle" id="panelSubtitle">토요일</div>
+          <div class="panel-date" id="panelDate"></div>
+          <div class="panel-subtitle" id="panelSubtitle"></div>
         </div>
-        <div class="panel-filter-tabs" id="panelFilterTabs">
+      </div>
+      <div class="panel-filter-bar" id="panelFilterBar">
+        <div class="panel-filter-tabs" id="panelFilterTabs" style="width:100%;">
           <button class="pf-tab active" data-filter="all"   onclick="setPanelFilter('all')">전체</button>
           <button class="pf-tab"        data-filter="todo"  onclick="setPanelFilter('todo')">할일</button>
           <button class="pf-tab"        data-filter="memo"  onclick="setPanelFilter('memo')">메모</button>
@@ -2170,7 +2174,7 @@ let currentMode = 'calendar'; // 'calendar' | 'memo'
 function toggleMode(){
   currentMode = currentMode==='calendar' ? 'memo' : 'calendar';
   const btn = document.getElementById('modeToggleBtn');
-  const filterTabs = document.getElementById('panelFilterTabs');
+  const filterBar = document.getElementById('panelFilterBar');
 
   if(currentMode==='memo'){
     btn.style.opacity='1';
@@ -2181,8 +2185,8 @@ function toggleMode(){
     document.getElementById('calNav').style.display='none';
     document.getElementById('selectedDayNum').textContent='📝';
     document.getElementById('selectedMonthName').textContent='메모 목록';
-    // 메모 모드에서는 필터 탭 숨김
-    if(filterTabs) filterTabs.style.display='none';
+    // 메모 모드에서는 필터 바 전체 숨김
+    if(filterBar) filterBar.style.display='none';
     loadMemoMode();
   } else {
     document.getElementById('monthProgress').style.display='';
@@ -2190,8 +2194,8 @@ function toggleMode(){
     document.getElementById('calGrid').style.display='';
     document.getElementById('calNav').style.display='';
     btn.title='메모 목록 보기';
-    // 캘린더 모드 복귀 시 필터 탭 복원
-    if(filterTabs) filterTabs.style.display='';
+    // 캘린더 모드 복귀 시 필터 바 복원
+    if(filterBar) filterBar.style.display='';
     loadAndRender();
   }
 }
