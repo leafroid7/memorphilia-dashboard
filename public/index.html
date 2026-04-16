@@ -207,6 +207,7 @@
     .panel-date strong { color: var(--accent); }
     .panel-subtitle { font-size: 11px; color: var(--text-3); margin-top: 3px; font-weight: 400; letter-spacing: 0.3px; }
     .panel-filter-bar { display: none; } /* PC에서는 숨김 — 탭은 panel-header-top 안에 있음 */
+    .panel-filter-bar.force-hide { display: none !important; } /* toggleMode에서 모바일도 강제 숨김 */
     .panel-filter-tabs { display: flex; gap: 3px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; border: 1px solid var(--border); flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
     .pf-tab { padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; border: none; background: none; color: var(--text-3); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
     .pf-tab:hover { color: var(--text-2); }
@@ -565,8 +566,8 @@
 
     <div class="cal-header">
       <div>
-        <div class="cal-day-num" id="selectedDayNum">11</div>
-        <div class="cal-month-name" id="selectedMonthName">April</div>
+        <div class="cal-day-num" id="selectedDayNum"></div>
+        <div class="cal-month-name" id="selectedMonthName"></div>
       </div>
       <!-- 달력 아이콘: 클릭 시 모드 전환 (캘린더 ↔ 메모 목록) -->
       <button class="cal-icon-btn" id="modeToggleBtn" onclick="toggleMode()" title="모드 전환">
@@ -860,8 +861,15 @@ const searchCache={};
 
 // 페이지 로드 즉시 오늘 날짜로 헤더 초기화 (loadAndRender 실행 전 빈 화면 방지)
 ;(()=>{
-  const {y,m,d}=_today;
+  const MONTHS_K=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const WDAY=['일','월','화','수','목','금','토'];
+  const {y,m,d}=_today;
+  // 캘린더 왼쪽 큰 숫자
+  const dayNum=document.getElementById('selectedDayNum');
+  const monthName=document.getElementById('selectedMonthName');
+  if(dayNum) dayNum.textContent=d;
+  if(monthName) monthName.textContent=MONTHS_K[m-1];
+  // 패널 헤더
   const el=document.getElementById('panelDate');
   const sl=document.getElementById('panelSubtitle');
   if(el) el.innerHTML=`${y}년 ${m}월 <strong>${d}</strong>일`;
@@ -2210,8 +2218,9 @@ function toggleMode(){
     document.getElementById('calNav').style.display='none';
     document.getElementById('selectedDayNum').textContent='📝';
     document.getElementById('selectedMonthName').textContent='메모 목록';
-    // 메모 모드에서는 필터 바 전체 숨김
-    if(filterBar) filterBar.style.display='none';
+    // 메모 모드: PC탭 + 모바일탭 모두 숨김 (클래스로 처리 — 인라인 스타일은 미디어쿼리를 이겨버림)
+    document.getElementById('panelFilterTabs')?.classList.add('force-hide');
+    if(filterBar) filterBar.classList.add('force-hide');
     loadMemoMode();
   } else {
     document.getElementById('monthProgress').style.display='';
@@ -2219,8 +2228,9 @@ function toggleMode(){
     document.getElementById('calGrid').style.display='';
     document.getElementById('calNav').style.display='';
     btn.title='메모 목록 보기';
-    // 캘린더 모드 복귀 시 필터 바 복원
-    if(filterBar) filterBar.style.display='';
+    // 캘린더 모드 복귀: 숨김 해제
+    document.getElementById('panelFilterTabs')?.classList.remove('force-hide');
+    if(filterBar) filterBar.classList.remove('force-hide');
     loadAndRender();
   }
 }
