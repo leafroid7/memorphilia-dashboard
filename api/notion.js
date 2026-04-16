@@ -167,15 +167,24 @@ module.exports = async (req, res) => {
 
     // ── getMemos: 임시 메모 목록 (모드 전환용) ──────────
     if (action === 'getMemos') {
-      const response = await notion.dataSources.query({
-        data_source_id: TODO_DB_ID,
-        filter: {
-          property: '𝐀𝐜𝐭𝐢𝐨𝐧 𝐏𝐥𝐚𝐧 𝒇𝒓𝒐𝒎',
-          relation: { contains: IMSI_MEMO_PAGE_ID }
-        },
-        sorts: [{ timestamp: 'created_time', direction: 'descending' }]
-      });
-      return res.json({ todos: response.results.map(mapTodo) });
+      let allResults = [];
+      let cursor = undefined;
+      do {
+        const params = {
+          data_source_id: TODO_DB_ID,
+          filter: {
+            property: '𝐀𝐜𝐭𝐢𝐨𝐧 𝐏𝐥𝐚𝐧 𝒇𝒓𝒐𝒎',
+            relation: { contains: IMSI_MEMO_PAGE_ID }
+          },
+          sorts: [{ timestamp: 'created_time', direction: 'descending' }],
+          page_size: 100
+        };
+        if (cursor) params.start_cursor = cursor;
+        const response = await notion.dataSources.query(params);
+        allResults = allResults.concat(response.results);
+        cursor = response.has_more ? response.next_cursor : undefined;
+      } while (cursor);
+      return res.json({ todos: allResults.map(mapTodo) });
     }
 
     // ── archiveTodo: 페이지 아카이브(삭제) ───────────
@@ -197,6 +206,7 @@ module.exports = async (req, res) => {
 function mapTodo(page) {
   const p = page.properties;
   const dl = p['데드라인']?.date;
+  const apIds = p['𝐀𝐜𝐭𝐢𝐨𝐧 𝐏𝐥𝐚𝐧 𝒇𝒓𝒐𝒎']?.relation?.map(r=>r.id) || [];
   return {
     id:          page.id,
     title:       p['리스트']?.title?.[0]?.plain_text || '(제목 없음)',
@@ -205,14 +215,14 @@ function mapTodo(page) {
     status:      p['🪐']?.status?.name || null,
     priority:    p['𝑷𝒓𝒊𝒐𝒓𝒊𝒕𝒚']?.select?.name || null,
     groupMode:   p['그룹\uD835\uDDFA\uD835\uDDFC\uD835\uDDF1\uD835\uDDF2']?.select?.name || null,
-    // 소요시간: 타임블록(𝗵) (표시) = 파란 메인, Tracker = 회색 서브
     timeBlockH:  p['타임블록(\uD835\uDDF5) (표시)']?.formula?.string || null,
     tracker:     p['Tracker']?.formula?.string || null,
-    timeBlock:   p['타임블록 요약']?.formula?.string || null, // 하위호환 유지
+    timeBlock:   p['타임블록 요약']?.formula?.string || null,
     note:        p['비고']?.rich_text?.[0]?.plain_text || null,
     est:         p['est.']?.number ?? null,
     startTime:   p['Start Time']?.date?.start || null,
     endTime:     p['End Time']?.date?.start   || null,
-    url:         page.url
+    url:         page.url,
+    _isMemo:     apIds.includes(IMSI_MEMO_PAGE_ID)
   };
 }

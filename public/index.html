@@ -204,6 +204,11 @@
     .panel-date { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--text-1); line-height: 1.2; }
     .panel-date strong { color: var(--accent); }
     .panel-subtitle { font-size: 11px; color: var(--text-3); margin-top: 3px; font-weight: 400; letter-spacing: 0.3px; }
+    /* 패널 필터 탭 */
+    .panel-filter-tabs { display: flex; gap: 3px; background: var(--surface-2); border-radius: var(--radius-sm); padding: 3px; border: 1px solid var(--border); flex-shrink: 0; align-self: flex-start; margin-top: 2px; }
+    .pf-tab { padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif; border: none; background: none; color: var(--text-3); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+    .pf-tab:hover { color: var(--text-2); }
+    .pf-tab.active { background: var(--surface); color: var(--text-1); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
     /* Todo 목록 */
     .todo-list { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 5px; max-height: 540px; overflow-y: auto; }
@@ -597,8 +602,18 @@
   <!-- 사이드 패널 -->
   <div class="card" id="sidePanel">
     <div class="panel-header">
-      <div class="panel-date" id="panelDate">2026년 4월 <strong>11</strong>일</div>
-      <div class="panel-subtitle" id="panelSubtitle">토요일</div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+        <div>
+          <div class="panel-date" id="panelDate">2026년 4월 <strong>11</strong>일</div>
+          <div class="panel-subtitle" id="panelSubtitle">토요일</div>
+        </div>
+        <!-- 필터 탭 -->
+        <div class="panel-filter-tabs" id="panelFilterTabs">
+          <button class="pf-tab active" data-filter="all"   onclick="setPanelFilter('all')">전체</button>
+          <button class="pf-tab"        data-filter="todo"  onclick="setPanelFilter('todo')">할일</button>
+          <button class="pf-tab"        data-filter="memo"  onclick="setPanelFilter('memo')">메모</button>
+        </div>
+      </div>
     </div>
     <div id="todoContainer">
       <div class="loading-state"><div class="spinner"></div><p style="font-size:12px;color:var(--text-3)">불러오는 중...</p></div>
@@ -822,6 +837,7 @@ let selectedDate={..._today};
 const todoCache={};
 let currentTodo=null;
 let createIsMemo=false, selPriVal=null, selApId=null, selGmVal=null;
+let panelFilter = 'all'; // 'all' | 'todo' | 'memo'
 let apDebounce=null, searchDebounce=null, detailApDebounce=null;
 const searchCache={};
 
@@ -985,6 +1001,23 @@ async function selectDate(y,m,d){
 }
 
 // ══════════════════════════════════════════════════════
+// 패널 필터
+// ══════════════════════════════════════════════════════
+// 임시 메모 액션플랜 페이지 ID (메모 판별용)
+const IMSI_MEMO_ID = '33eec7e5-b9b0-8069-bee2-e9ce7e1ab0d6';
+
+// 메모 캐시 (날짜키 → todo 배열)
+const memoCache = {};
+
+function setPanelFilter(filter){
+  panelFilter = filter;
+  document.querySelectorAll('.pf-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+  updatePanel(selectedDate.y, selectedDate.m, selectedDate.d);
+}
+
+// ══════════════════════════════════════════════════════
 // 패널
 // ══════════════════════════════════════════════════════
 function updatePanel(y,m,d){
@@ -992,7 +1025,19 @@ function updatePanel(y,m,d){
   document.getElementById('panelSubtitle').textContent=`${WEEKDAY[new Date(y,m-1,d).getDay()]}요일`;
   const todos=todoCache[`${y}-${m}`]||[];
   const key=dateKey(y,m,d);
-  renderTodoList(todos.filter(t=>deadlineDateKey(t.deadline)===key));
+  const dayTodos = todos.filter(t=>deadlineDateKey(t.deadline)===key);
+
+  if(panelFilter==='all'){
+    renderTodoList(dayTodos);
+  } else if(panelFilter==='todo'){
+    // 할일: 메모(임시 메모 연결)가 아닌 것
+    renderTodoList(dayTodos.filter(t=>!t._isMemo));
+  } else if(panelFilter==='memo'){
+    // 메모: 해당 날짜 항목 중 메모인 것
+    // 캐시에 메모 여부가 없으면 전체 메모 목록에서 필터
+    const memos = dayTodos.filter(t=>t._isMemo);
+    renderTodoList(memos);
+  }
 }
 
 // ══════════════════════════════════════════════════════
