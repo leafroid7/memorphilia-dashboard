@@ -200,8 +200,8 @@
     .cal-tab-btn:hover { background: var(--accent-bg); color: var(--accent); }
 
     /* ══ 사이드 패널 ══ */
-    .panel-header { padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
-    .panel-header-inner { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+    .panel-header { padding: 14px 16px 0; border-bottom: 1px solid var(--border); }
+    .panel-header-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding-bottom: 10px; }
     .panel-date { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--text-1); line-height: 1.2; }
     .panel-date strong { color: var(--accent); }
     .panel-subtitle { font-size: 11px; color: var(--text-3); margin-top: 3px; font-weight: 400; letter-spacing: 0.3px; }
@@ -602,7 +602,7 @@
   <!-- 사이드 패널 -->
   <div class="card" id="sidePanel">
     <div class="panel-header">
-      <div class="panel-header-inner">
+      <div class="panel-header-top">
         <div>
           <div class="panel-date" id="panelDate">2026년 4월 <strong>11</strong>일</div>
           <div class="panel-subtitle" id="panelSubtitle">토요일</div>
