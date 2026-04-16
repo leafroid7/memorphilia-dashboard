@@ -23,23 +23,32 @@ module.exports = async (req, res) => {
       const year  = parseInt(req.query.year)  || new Date().getFullYear();
       const month = parseInt(req.query.month) || new Date().getMonth() + 1;
 
-      // toISOString()은 UTC 기준이라 KST에서 하루 밀릴 수 있음
-      // 날짜 문자열을 직접 포맷해서 타임존 문제 완전 차단
       const pad = v => String(v).padStart(2, '0');
       const fmtDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 
       const s = new Date(year, month - 1, 1); s.setDate(s.getDate() - 7);
       const e = new Date(year, month, 1);     e.setDate(e.getDate() + 7);
 
-      const response = await notion.dataSources.query({
-        data_source_id: TODO_DB_ID,
-        filter: { and: [
-          { property: '데드라인', date: { on_or_after: fmtDate(s) } },
-          { property: '데드라인', date: { before:      fmtDate(e) } }
-        ]},
-        sorts: [{ property: '데드라인', direction: 'ascending' }]
-      });
-      return res.json({ todos: response.results.map(mapTodo) });
+      // 노션 API 100개 제한 → 페이지네이션으로 전체 조회
+      let allResults = [];
+      let cursor = undefined;
+      do {
+        const params = {
+          data_source_id: TODO_DB_ID,
+          filter: { and: [
+            { property: '데드라인', date: { on_or_after: fmtDate(s) } },
+            { property: '데드라인', date: { before:      fmtDate(e) } }
+          ]},
+          sorts: [{ property: '데드라인', direction: 'ascending' }],
+          page_size: 100,
+        };
+        if (cursor) params.start_cursor = cursor;
+        const response = await notion.dataSources.query(params);
+        allResults = allResults.concat(response.results);
+        cursor = response.has_more ? response.next_cursor : undefined;
+      } while (cursor);
+
+      return res.json({ todos: allResults.map(mapTodo) });
     }
 
     // ── searchTodos ───────────────────────────────
