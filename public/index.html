@@ -224,7 +224,7 @@
     .sort-btn:hover { background: var(--border); }
     .sort-btn.active { background: var(--text-1); color: #fff; border-color: var(--text-1); }
     /* 메모 줄 아이콘 (B형: 파형) */
-    .memo-icon { display: flex; flex-direction: column; justify-content: center; gap: 2.8px; width: 11px; flex-shrink: 0; }
+    .memo-icon { display: flex; flex-direction: column; justify-content: center; gap: 2.8px; width: 11px; flex-shrink: 0; margin-top: 4px; align-self: flex-start; }
     .memo-icon span { display: block; height: 1.3px; border-radius: 1px; background: var(--text-3); }
     .memo-icon span:nth-child(1) { width: 73%; }
     .memo-icon span:nth-child(2) { width: 100%; }
@@ -1141,19 +1141,35 @@ function updatePanel(y,m,d){
 
 function renderMatrixView(todos){
   const container=document.getElementById('todoContainer');
-  const quads={1:[],2:[],3:[],4:[],null:[]};
-  todos.forEach(t=>{
-    if(t._isMemo) return; // 메모는 매트릭스 제외
-    const n=priNum(t.priority);
-    if(n) quads[n].push(t);
-    else quads[null].push(t);
-  });
+  // 완료/미완료 분리
+  const active = todos.filter(t=>!t.status?.includes('Done') && !t._isMemo);
+  const done   = todos.filter(t=>t.status?.includes('Done')  && !t._isMemo);
+
+  const quadsActive={1:[],2:[],3:[],4:[],null:[]};
+  const quadsDone  ={1:[],2:[],3:[],4:[],null:[]};
+  active.forEach(t=>{ const n=priNum(t.priority); (quadsActive[n||null]).push(t); });
+  done.forEach(t=>{   const n=priNum(t.priority); (quadsDone  [n||null]).push(t); });
 
   const QUAD_STYLES={
-    1:{bg:'#fcebeb',border:'#f09595',label:'1 · Do now',textColor:'#a32d2d'},
-    2:{bg:'#faeeda',border:'#ef9f27',label:'2 · Delegate',textColor:'#854f0b'},
-    3:{bg:'#eaf3de',border:'#97c459',label:'3 · Do later',textColor:'#3b6d11'},
-    4:{bg:'#f1efe8',border:'#d3d1c7',label:'4 · Delete',textColor:'#5f5e5a'},
+    1:{bg:'#fcebeb',border:'#f09595',label:'1 · Do now',   textColor:'#a32d2d'},
+    2:{bg:'#faeeda',border:'#ef9f27',label:'2 · Delegate', textColor:'#854f0b'},
+    3:{bg:'#eaf3de',border:'#97c459',label:'3 · Do later', textColor:'#3b6d11'},
+    4:{bg:'#f1efe8',border:'#d3d1c7',label:'4 · Delete',   textColor:'#5f5e5a'},
+  };
+
+  // 매트릭스 카드 생성 — todo-item과 동일한 구조
+  const makeMatrixCard = (t, isDone) => {
+    const item=document.createElement('div');
+    item.className='todo-item'+(isDone?' is-done':'');
+    item.style.marginBottom='3px';
+    const iconHtml=`<div class="todo-status-dot ${statusClass(t.status)}"></div>`;
+    item.innerHTML=`${iconHtml}
+      <div class="todo-content">
+        <div class="todo-title${isDone?' done-title':''}">${escHtml(t.title)}</div>
+        ${priBadgeHtml(t.priority)?`<div class="todo-meta">${priBadgeHtml(t.priority)}</div>`:''}
+      </div>`;
+    item.addEventListener('click',()=>openDetail(t));
+    return item;
   };
 
   const grid=document.createElement('div');
@@ -1169,20 +1185,24 @@ function renderMatrixView(todos){
     label.style.color=s.textColor;
     label.textContent=s.label;
     quad.appendChild(label);
-    if(quads[n].length===0){
+
+    const activeItems = quadsActive[n]||[];
+    const doneItems   = quadsDone[n]||[];
+
+    if(activeItems.length===0 && doneItems.length===0){
       const empty=document.createElement('div');
       empty.className='matrix-empty';
       empty.textContent='없음';
       quad.appendChild(empty);
     } else {
-      quads[n].forEach(t=>{
-        const item=document.createElement('div');
-        item.className='matrix-quad-item';
-        item.title=t.title;
-        item.textContent=t.title;
-        item.addEventListener('click',()=>openDetail(t));
-        quad.appendChild(item);
-      });
+      activeItems.forEach(t=>quad.appendChild(makeMatrixCard(t, false)));
+      if(doneItems.length>0){
+        // 완료 구분선
+        const sep=document.createElement('div');
+        sep.style.cssText='height:1px;background:rgba(0,0,0,0.08);margin:5px 0 4px;';
+        quad.appendChild(sep);
+        doneItems.forEach(t=>quad.appendChild(makeMatrixCard(t, true)));
+      }
     }
     grid.appendChild(quad);
   });
@@ -1190,26 +1210,20 @@ function renderMatrixView(todos){
   container.innerHTML='';
   container.appendChild(grid);
 
-  // 미분류
-  if(quads[null].length>0){
+  // 미분류 (완료/미완료 모두 포함)
+  const uncActive = quadsActive[null]||[];
+  const uncDone   = quadsDone[null]||[];
+  if(uncActive.length>0 || uncDone.length>0){
     const unc=document.createElement('div');
     unc.className='matrix-unclassified';
     const lbl=document.createElement('div');
     lbl.className='matrix-unc-label';
-    lbl.textContent=`미분류 · ${quads[null].length}`;
+    lbl.textContent=`미분류 · ${uncActive.length+uncDone.length}`;
     unc.appendChild(lbl);
     const list=document.createElement('div');
     list.style.cssText='display:flex;flex-direction:column;gap:4px;';
-    quads[null].forEach(t=>{
-      const item=document.createElement('div');
-      item.className='todo-item';
-      const iconHtml=t._isMemo
-        ?`<div class="memo-icon"><span></span><span></span><span></span></div>`
-        :`<div class="todo-status-dot ${statusClass(t.status)}"></div>`;
-      item.innerHTML=`${iconHtml}<div class="todo-content"><div class="todo-title">${escHtml(t.title)}</div></div>`;
-      item.addEventListener('click',()=>openDetail(t));
-      list.appendChild(item);
-    });
+    uncActive.forEach(t=>list.appendChild(makeMatrixCard(t,false)));
+    uncDone.forEach(t=>list.appendChild(makeMatrixCard(t,true)));
     unc.appendChild(list);
     container.appendChild(unc);
   }
