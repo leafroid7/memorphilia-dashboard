@@ -1,18 +1,21 @@
 {
   "name": "MEMORPHILIA",
-  "short_name": "MEMORPHILIA",
+  "short_name": "메모필리아",
   "description": "나만의 생산성 대시보드",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#1a1714",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#f0ede8",
   "theme_color": "#1a1714",
+  "lang": "ko",
   "icons": [
-    {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+    { "src": "/icon-32.png",  "sizes": "32x32",   "type": "image/png" },
+    { "src": "/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/favicon.svg",  "sizes": "any",     "type": "image/svg+xml" }
   ]
 }

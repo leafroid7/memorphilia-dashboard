@@ -6,10 +6,12 @@
   <meta name="theme-color" content="#1a1714">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="MEMORPHILIA">
+  <meta name="apple-mobile-web-app-title" content="메모필리아">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>MEMORPHILIA</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/icon-32.png">
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-  <link rel="apple-touch-icon" href="/icon-192.svg">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icon-180.png">
   <link rel="manifest" href="/manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1096,7 +1098,12 @@ function toggleSort(){
   const label = sortMode==='time' ? '시간순' : '우선순위순';
   document.querySelectorAll('#sortLabel,#sortLabelMobile').forEach(el=>{ if(el) el.textContent=label; });
   document.querySelectorAll('.sort-btn').forEach(btn=>btn.classList.toggle('active', sortMode==='priority'));
-  updatePanel(selectedDate.y, selectedDate.m, selectedDate.d);
+  if(currentMode==='memo') loadMemoMode();
+  else updatePanel(selectedDate.y, selectedDate.m, selectedDate.d);
+  // 모바일: 패널이 캘린더 아래에 있어 변화가 안 보임 → 리스트 영역으로 스크롤
+  if(window.innerWidth <= 720){
+    setTimeout(()=>document.getElementById('todoContainer')?.scrollIntoView({behavior:'smooth', block:'start'}), 80);
+  }
 }
 
 function sortTodos(todos){
