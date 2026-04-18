@@ -1165,11 +1165,20 @@ function renderMatrixView(todos){
     item.className='todo-item'+(isDone?' is-done':'');
     item.style.marginBottom='3px';
     const iconHtml=`<div class="todo-status-dot ${statusClass(t.status)}"></div>`;
+    // 시작시간 추출 (makeTodoItem과 동일 로직)
+    const startTimeStr = (() => {
+      if(!t.deadline) return '';
+      if(!/T\d{2}:\d{2}/.test(t.deadline)) return '';
+      const d=parseDate(t.deadline);
+      if(!d) return '';
+      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    })();
     item.innerHTML=`${iconHtml}
       <div class="todo-content">
         <div class="todo-title${isDone?' done-title':''}">${escHtml(t.title)}</div>
         ${priBadgeHtml(t.priority)?`<div class="todo-meta">${priBadgeHtml(t.priority)}</div>`:''}
-      </div>`;
+      </div>
+      ${startTimeStr?`<span class="todo-start-time">${startTimeStr}</span>`:''}`;
     item.addEventListener('click',()=>openDetail(t));
     return item;
   };
@@ -1364,6 +1373,7 @@ function renderDetail(todo, actionPlans){
         ${escHtml(todo.status||'None')} ▾
       </span>
       <div class="status-dropdown" id="statusDropdown" style="display:none;position:absolute;top:calc(100%+4px);left:0;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);z-index:200;min-width:140px;overflow:hidden;">
+        <div class="status-dd-item sb-none"     onclick="changeStatus('None')">— None</div>
         <div class="status-dd-item sb-ready"   onclick="changeStatus('🌑Ready')">🌑 Ready</div>
         <div class="status-dd-item sb-progress" onclick="changeStatus('🌗In Progress')">🌗 In Progress</div>
         <div class="status-dd-item sb-done"     onclick="changeStatus('🌕Done')">🌕 Done</div>
