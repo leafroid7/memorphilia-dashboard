@@ -272,6 +272,8 @@
     /* 완료: 확실한 비활성화 */
     .todo-item.is-done { opacity: 0.38; filter: grayscale(0.3); }
     .todo-item.is-done:hover { opacity: 0.58; background: #d4ede6; transform: translateX(2px); }
+    /* 카드 우측 시작시간 */
+    .todo-start-time { font-size: 10px; color: var(--text-3); font-weight: 500; flex-shrink: 0; align-self: flex-start; margin-top: 3px; letter-spacing: 0.2px; }
 
     /* 상태 도트 */
     .todo-status-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
@@ -647,9 +649,9 @@
           <div class="panel-date" id="panelDate"></div>
           <div class="panel-subtitle" id="panelSubtitle"></div>
         </div>
-        <!-- PC용 탭 (모바일에서 숨김) -->
-        <div style="display:flex;align-items:center;gap:6px;">
-          <div class="panel-filter-tabs panel-filter-tabs-top" id="panelFilterTabs">
+        <!-- PC용 탭+정렬 (모바일에서 숨김) -->
+        <div class="panel-filter-tabs-top" style="display:flex;align-items:center;gap:6px;">
+          <div class="panel-filter-tabs" id="panelFilterTabs">
             <button class="pf-tab active" data-filter="all"      onclick="setPanelFilter('all')">전체</button>
             <button class="pf-tab"        data-filter="todo"     onclick="setPanelFilter('todo')">할일</button>
             <button class="pf-tab"        data-filter="memo"     onclick="setPanelFilter('memo')">메모</button>
@@ -661,7 +663,7 @@
           </button>
         </div>
       </div>
-      <!-- 모바일용 탭 (PC에서 숨김) -->
+      <!-- 모바일용 탭+정렬 (PC에서 숨김) -->
       <div class="panel-filter-bar" id="panelFilterBar">
         <div style="display:flex;align-items:center;gap:6px;width:100%;">
           <div class="panel-filter-tabs" id="panelFilterTabsMobile" style="flex:1;">
@@ -1308,16 +1310,26 @@ function makeTodoItem(t){
   const prog=t.status?.includes('Progress');
   const el=document.createElement('div');
   el.className='todo-item'+(done?' is-done':prog?' is-progress':'');
-  // 메모: B형 줄 아이콘 / 할일: 상태 도트
   const iconHtml = t._isMemo
     ? `<div class="memo-icon"><span></span><span></span><span></span></div>`
     : `<div class="todo-status-dot ${statusClass(t.status)}"></div>`;
+  // 마감일 시작시간 추출 (시간 포함된 경우만)
+  const startTimeStr = (() => {
+    if(!t.deadline) return '';
+    const hasTime = /T\d{2}:\d{2}/.test(t.deadline);
+    if(!hasTime) return '';
+    const d = parseDate(t.deadline);
+    if(!d) return '';
+    const h = d.getHours(), m = d.getMinutes();
+    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  })();
   el.innerHTML=`
     ${iconHtml}
     <div class="todo-content">
       <div class="todo-title${done?' done-title':''}">${escHtml(t.title)}</div>
       <div class="todo-meta">${priBadgeHtml(t.priority)}${timeBlockHtml(t.timeBlock, t.timeBlockH, t.tracker)}</div>
-    </div>`;
+    </div>
+    ${startTimeStr?`<span class="todo-start-time">${startTimeStr}</span>`:''}`;
   el.addEventListener('click',()=>openDetail(t));
   return el;
 }
@@ -2376,7 +2388,7 @@ function toggleMode(){
     document.getElementById('selectedDayNum').textContent='📝';
     document.getElementById('selectedMonthName').textContent='메모 목록';
     // 메모 모드: PC탭 + 모바일탭 모두 숨김 (클래스로 처리 — 인라인 스타일은 미디어쿼리를 이겨버림)
-    document.getElementById('panelFilterTabs')?.classList.add('force-hide');
+    document.querySelector('.panel-filter-tabs-top')?.classList.add('force-hide');
     if(filterBar) filterBar.classList.add('force-hide');
     loadMemoMode();
   } else {
@@ -2386,7 +2398,7 @@ function toggleMode(){
     document.getElementById('calNav').style.display='';
     btn.title='메모 목록 보기';
     // 캘린더 모드 복귀: 숨김 해제
-    document.getElementById('panelFilterTabs')?.classList.remove('force-hide');
+    document.querySelector('.panel-filter-tabs-top')?.classList.remove('force-hide');
     if(filterBar) filterBar.classList.remove('force-hide');
     loadAndRender();
   }
