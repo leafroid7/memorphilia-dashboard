@@ -214,11 +214,30 @@
     .pf-tab.active { background: var(--surface); color: var(--text-1); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     /* 모바일: 탭을 날짜 아래 독립 줄로 */
     @media (max-width: 720px) {
-      .panel-filter-tabs-top { display: none !important; } /* PC용 탭 숨김 */
+      .panel-filter-tabs-top { display: none !important; }
       .panel-filter-bar { display: flex !important; padding-top: 10px; }
-      .panel-filter-bar .panel-filter-tabs { width: 100%; }
+      .panel-filter-bar .panel-filter-tabs { flex:1; }
       .panel-filter-bar .pf-tab { flex: 1; text-align: center; }
     }
+    /* 정렬 버튼 */
+    .sort-btn { display: inline-flex; align-items: center; gap: 3px; padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); font-size: 10px; font-weight: 500; font-family: 'DM Sans', sans-serif; cursor: pointer; white-space: nowrap; transition: all 0.12s; flex-shrink: 0; }
+    .sort-btn:hover { background: var(--border); }
+    .sort-btn.active { background: var(--text-1); color: #fff; border-color: var(--text-1); }
+    /* 메모 줄 아이콘 (B형: 파형) */
+    .memo-icon { display: flex; flex-direction: column; justify-content: center; gap: 2.8px; width: 11px; flex-shrink: 0; }
+    .memo-icon span { display: block; height: 1.3px; border-radius: 1px; background: var(--text-3); }
+    .memo-icon span:nth-child(1) { width: 73%; }
+    .memo-icon span:nth-child(2) { width: 100%; }
+    .memo-icon span:nth-child(3) { width: 55%; }
+    /* 매트릭스 뷰 */
+    .matrix-view { padding: 10px 12px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .matrix-quad { border-radius: var(--radius-sm); padding: 9px; border: 1px solid; min-height: 60px; }
+    .matrix-quad-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px; }
+    .matrix-quad-item { background: rgba(255,255,255,0.7); border-radius: 4px; padding: 3px 6px; margin-bottom: 3px; font-size: 11px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 0.5px solid rgba(0,0,0,0.07); transition: opacity 0.12s; }
+    .matrix-quad-item:hover { opacity: 0.7; }
+    .matrix-empty { font-size: 10px; color: var(--text-3); padding: 2px 0; }
+    .matrix-unclassified { padding: 8px 12px 12px; border-top: 1px solid var(--border); }
+    .matrix-unc-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
 
     /* Todo 목록 */
     .todo-list { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 5px; max-height: 540px; overflow-y: auto; }
@@ -618,18 +637,32 @@
           <div class="panel-subtitle" id="panelSubtitle"></div>
         </div>
         <!-- PC용 탭 (모바일에서 숨김) -->
-        <div class="panel-filter-tabs panel-filter-tabs-top" id="panelFilterTabs">
-          <button class="pf-tab active" data-filter="all"  onclick="setPanelFilter('all')">전체</button>
-          <button class="pf-tab"        data-filter="todo" onclick="setPanelFilter('todo')">할일</button>
-          <button class="pf-tab"        data-filter="memo" onclick="setPanelFilter('memo')">메모</button>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="panel-filter-tabs panel-filter-tabs-top" id="panelFilterTabs">
+            <button class="pf-tab active" data-filter="all"      onclick="setPanelFilter('all')">전체</button>
+            <button class="pf-tab"        data-filter="todo"     onclick="setPanelFilter('todo')">할일</button>
+            <button class="pf-tab"        data-filter="memo"     onclick="setPanelFilter('memo')">메모</button>
+            <button class="pf-tab"        data-filter="matrix"   onclick="setPanelFilter('matrix')">매트릭스</button>
+          </div>
+          <button class="sort-btn" id="sortBtn" onclick="toggleSort()" title="정렬">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="1" y1="6.5" x2="9" y2="6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="1" y1="10" x2="6" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span id="sortLabel">시간순</span>
+          </button>
         </div>
       </div>
       <!-- 모바일용 탭 (PC에서 숨김) -->
       <div class="panel-filter-bar" id="panelFilterBar">
-        <div class="panel-filter-tabs" id="panelFilterTabsMobile">
-          <button class="pf-tab active" data-filter="all"  onclick="setPanelFilter('all')">전체</button>
-          <button class="pf-tab"        data-filter="todo" onclick="setPanelFilter('todo')">할일</button>
-          <button class="pf-tab"        data-filter="memo" onclick="setPanelFilter('memo')">메모</button>
+        <div style="display:flex;align-items:center;gap:6px;width:100%;">
+          <div class="panel-filter-tabs" id="panelFilterTabsMobile" style="flex:1;">
+            <button class="pf-tab active" data-filter="all"    onclick="setPanelFilter('all')">전체</button>
+            <button class="pf-tab"        data-filter="todo"   onclick="setPanelFilter('todo')">할일</button>
+            <button class="pf-tab"        data-filter="memo"   onclick="setPanelFilter('memo')">메모</button>
+            <button class="pf-tab"        data-filter="matrix" onclick="setPanelFilter('matrix')">매트릭스</button>
+          </div>
+          <button class="sort-btn" id="sortBtnMobile" onclick="toggleSort()" title="정렬">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><line x1="1" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="1" y1="6.5" x2="9" y2="6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="1" y1="10" x2="6" y2="10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span id="sortLabelMobile">시간순</span>
+          </button>
         </div>
       </div>
     </div>
@@ -855,7 +888,8 @@ let selectedDate={..._today};
 const todoCache={};
 let currentTodo=null;
 let createIsMemo=false, selPriVal=null, selApId=null, selGmVal=null;
-let panelFilter = 'all'; // 'all' | 'todo' | 'memo'
+let panelFilter = 'all'; // 'all' | 'todo' | 'memo' | 'matrix'
+let sortMode = 'time'; // 'time' | 'priority'
 let apDebounce=null, searchDebounce=null, detailApDebounce=null;
 const searchCache={};
 
@@ -1044,9 +1078,29 @@ const IMSI_MEMO_ID = '33eec7e5-b9b0-8069-bee2-e9ce7e1ab0d6';
 // 메모 캐시 (날짜키 → todo 배열)
 const memoCache = {};
 
+function toggleSort(){
+  sortMode = sortMode==='time' ? 'priority' : 'time';
+  const label = sortMode==='time' ? '시간순' : '우선순위순';
+  document.querySelectorAll('#sortLabel,#sortLabelMobile').forEach(el=>{ if(el) el.textContent=label; });
+  document.querySelectorAll('.sort-btn').forEach(btn=>btn.classList.toggle('active', sortMode==='priority'));
+  updatePanel(selectedDate.y, selectedDate.m, selectedDate.d);
+}
+
+function sortTodos(todos){
+  if(sortMode==='priority'){
+    const ord={'1':1,'2':2,'3':3,'4':4};
+    return [...todos].sort((a,b)=>(ord[priNum(a.priority)]||9)-(ord[priNum(b.priority)]||9));
+  }
+  return [...todos].sort((a,b)=>{
+    if(!a.deadline&&!b.deadline) return 0;
+    if(!a.deadline) return 1;
+    if(!b.deadline) return -1;
+    return new Date(a.deadline)-new Date(b.deadline);
+  });
+}
+
 function setPanelFilter(filter){
   panelFilter = filter;
-  // PC탭 + 모바일탭 모두 동기화
   document.querySelectorAll('.pf-tab').forEach(btn=>{
     btn.classList.toggle('active', btn.dataset.filter === filter);
   });
@@ -1063,16 +1117,90 @@ function updatePanel(y,m,d){
   const key=dateKey(y,m,d);
   const dayTodos = todos.filter(t=>deadlineDateKey(t.deadline)===key);
 
-  if(panelFilter==='all'){
-    renderTodoList(dayTodos);
+  if(panelFilter==='matrix'){
+    renderMatrixView(sortTodos(dayTodos));
+  } else if(panelFilter==='all'){
+    renderTodoList(sortTodos(dayTodos));
   } else if(panelFilter==='todo'){
-    // 할일: 메모(임시 메모 연결)가 아닌 것
-    renderTodoList(dayTodos.filter(t=>!t._isMemo));
+    renderTodoList(sortTodos(dayTodos.filter(t=>!t._isMemo)));
   } else if(panelFilter==='memo'){
-    // 메모: 해당 날짜 항목 중 메모인 것
-    // 캐시에 메모 여부가 없으면 전체 메모 목록에서 필터
-    const memos = dayTodos.filter(t=>t._isMemo);
-    renderTodoList(memos);
+    renderTodoList(sortTodos(dayTodos.filter(t=>t._isMemo)));
+  }
+}
+
+function renderMatrixView(todos){
+  const container=document.getElementById('todoContainer');
+  const quads={1:[],2:[],3:[],4:[],null:[]};
+  todos.forEach(t=>{
+    if(t._isMemo) return; // 메모는 매트릭스 제외
+    const n=priNum(t.priority);
+    if(n) quads[n].push(t);
+    else quads[null].push(t);
+  });
+
+  const QUAD_STYLES={
+    1:{bg:'#fcebeb',border:'#f09595',label:'1 · Do now',textColor:'#a32d2d'},
+    2:{bg:'#faeeda',border:'#ef9f27',label:'2 · Delegate',textColor:'#854f0b'},
+    3:{bg:'#eaf3de',border:'#97c459',label:'3 · Do later',textColor:'#3b6d11'},
+    4:{bg:'#f1efe8',border:'#d3d1c7',label:'4 · Delete',textColor:'#5f5e5a'},
+  };
+
+  const grid=document.createElement('div');
+  grid.className='matrix-view';
+
+  [1,2,3,4].forEach(n=>{
+    const s=QUAD_STYLES[n];
+    const quad=document.createElement('div');
+    quad.className='matrix-quad';
+    quad.style.cssText=`background:${s.bg};border-color:${s.border};`;
+    const label=document.createElement('div');
+    label.className='matrix-quad-label';
+    label.style.color=s.textColor;
+    label.textContent=s.label;
+    quad.appendChild(label);
+    if(quads[n].length===0){
+      const empty=document.createElement('div');
+      empty.className='matrix-empty';
+      empty.textContent='없음';
+      quad.appendChild(empty);
+    } else {
+      quads[n].forEach(t=>{
+        const item=document.createElement('div');
+        item.className='matrix-quad-item';
+        item.title=t.title;
+        item.textContent=t.title;
+        item.addEventListener('click',()=>openDetail(t));
+        quad.appendChild(item);
+      });
+    }
+    grid.appendChild(quad);
+  });
+
+  container.innerHTML='';
+  container.appendChild(grid);
+
+  // 미분류
+  if(quads[null].length>0){
+    const unc=document.createElement('div');
+    unc.className='matrix-unclassified';
+    const lbl=document.createElement('div');
+    lbl.className='matrix-unc-label';
+    lbl.textContent=`미분류 · ${quads[null].length}`;
+    unc.appendChild(lbl);
+    const list=document.createElement('div');
+    list.style.cssText='display:flex;flex-direction:column;gap:4px;';
+    quads[null].forEach(t=>{
+      const item=document.createElement('div');
+      item.className='todo-item';
+      const iconHtml=t._isMemo
+        ?`<div class="memo-icon"><span></span><span></span><span></span></div>`
+        :`<div class="todo-status-dot ${statusClass(t.status)}"></div>`;
+      item.innerHTML=`${iconHtml}<div class="todo-content"><div class="todo-title">${escHtml(t.title)}</div></div>`;
+      item.addEventListener('click',()=>openDetail(t));
+      list.appendChild(item);
+    });
+    unc.appendChild(list);
+    container.appendChild(unc);
   }
 }
 
@@ -1155,8 +1283,12 @@ function makeTodoItem(t){
   const prog=t.status?.includes('Progress');
   const el=document.createElement('div');
   el.className='todo-item'+(done?' is-done':prog?' is-progress':'');
+  // 메모: B형 줄 아이콘 / 할일: 상태 도트
+  const iconHtml = t._isMemo
+    ? `<div class="memo-icon"><span></span><span></span><span></span></div>`
+    : `<div class="todo-status-dot ${statusClass(t.status)}"></div>`;
   el.innerHTML=`
-    <div class="todo-status-dot ${statusClass(t.status)}"></div>
+    ${iconHtml}
     <div class="todo-content">
       <div class="todo-title${done?' done-title':''}">${escHtml(t.title)}</div>
       <div class="todo-meta">${priBadgeHtml(t.priority)}${timeBlockHtml(t.timeBlock, t.timeBlockH, t.tracker)}</div>
