@@ -231,13 +231,24 @@
     .memo-icon span:nth-child(3) { width: 55%; }
     /* 매트릭스 뷰 */
     .matrix-view { padding: 10px 12px 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-    .matrix-quad { border-radius: var(--radius-sm); padding: 9px; border: 1px solid; min-height: 60px; }
+    .matrix-quad { border-radius: var(--radius-sm); padding: 9px; border: 1px solid; min-height: 60px; overflow: hidden; }
     .matrix-quad-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px; }
-    .matrix-quad-item { background: rgba(255,255,255,0.7); border-radius: 4px; padding: 3px 6px; margin-bottom: 3px; font-size: 11px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 0.5px solid rgba(0,0,0,0.07); transition: opacity 0.12s; }
+    /* 매트릭스 카드 — todo-item과 동일한 규칙: 가로 고정, 세로 늘어남 */
+    .matrix-quad-item {
+      background: rgba(255,255,255,0.7); border-radius: 4px; padding: 4px 7px;
+      margin-bottom: 3px; font-size: 11px; cursor: pointer;
+      white-space: normal; word-break: keep-all; overflow-wrap: break-word;
+      border: 0.5px solid rgba(0,0,0,0.07); transition: opacity 0.12s;
+      display: block; width: 100%;
+    }
     .matrix-quad-item:hover { opacity: 0.7; }
     .matrix-empty { font-size: 10px; color: var(--text-3); padding: 2px 0; }
     .matrix-unclassified { padding: 8px 12px 12px; border-top: 1px solid var(--border); }
     .matrix-unc-label { font-size: 9px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+    /* 모바일: 매트릭스 1×4 */
+    @media (max-width: 720px) {
+      .matrix-view { grid-template-columns: 1fr; }
+    }
 
     /* Todo 목록 */
     .todo-list { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 5px; max-height: 540px; overflow-y: auto; }
