@@ -85,13 +85,20 @@ module.exports = async (req, res) => {
     // ── getActionPlans ────────────────────────────
     if (action === 'getActionPlans') {
       const q = (req.query.q || '').trim();
-      const params = {
-        data_source_id: ACTION_PLAN_DB_ID,
-        sorts: [{ property: 'Action', direction: 'ascending' }]
-      };
-      if (q) params.filter = { property: 'Action', title: { contains: q } };
-      const response = await notion.dataSources.query(params);
-      return res.json({ plans: response.results.map(p => ({
+      let allPlans = [], cursor = undefined;
+      do {
+        const params = {
+          data_source_id: ACTION_PLAN_DB_ID,
+          sorts: [{ property: 'Action', direction: 'ascending' }],
+          page_size: 100
+        };
+        if (q) params.filter = { property: 'Action', title: { contains: q } };
+        if (cursor) params.start_cursor = cursor;
+        const response = await notion.dataSources.query(params);
+        allPlans = allPlans.concat(response.results);
+        cursor = response.has_more ? response.next_cursor : undefined;
+      } while (cursor);
+      return res.json({ plans: allPlans.map(p => ({
         id:    p.id,
         title: p.properties['Action']?.title?.[0]?.plain_text || '(제목 없음)',
         icon:  p.icon?.type === 'emoji' ? p.icon.emoji : null
